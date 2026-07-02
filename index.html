@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#12213D">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<title>Mon Relevé</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{min-height:100%;background-color:#0B1120;background-image:radial-gradient(circle at top,#12213D 0%,#0B1120 60%);background-attachment:fixed;overscroll-behavior:none}
+body{min-height:100%;min-height:100dvh;width:100%;overflow-x:hidden;color:#fff;background-color:#0B1120;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+#status-bg{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.04));backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);z-index:60}
+#root{min-height:100vh;min-height:100dvh;padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
+select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='rgba(255,255,255,.5)' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+@media print{
+*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+html,body{background:#fff!important;color:#000!important;margin:0!important;padding:0!important}
+#root{padding:0!important}
+#status-bg{display:none!important}
+body *{visibility:hidden}
+#releve-pdf,#releve-pdf *{visibility:visible!important}
+#releve-pdf{position:absolute;left:0;top:0;width:100%;margin:0!important;padding:32px 24px!important;border-radius:0!important;box-shadow:none!important}
+#releve-pdf table{border:1.5px solid #000!important}
+#releve-pdf th,#releve-pdf td{border-color:#ccc!important}
+#releve-pdf th{border-bottom-color:#000!important}
+}
+</style>
+</head>
+<body>
+<div id="status-bg"></div>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+/*
+ * ╔═══════════════════════════════════════════════╗
+ * ║  MON RELEVÉ — v2.0                            ║
+ * ║  Compteur report · PDF simplifié · Nouveautés ║
+ * ╚═══════════════════════════════════════════════╝
+ */
+const VERSION = "2.0";
+const CHANGELOG = [
+  "Compteur de report d'heures automatique",
+  "Report affiché sur le relevé PDF",
+  "Envoi simplifié — bouton PDF unique",
+  "Popup nouveautés à chaque mise à jour"
+];
+const REPORT_WEEK_CAP = 180; // ±3h en minutes
+const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
+
+// ── Constants ──
+const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
+const D_PM_H = "10:00", D_PM_F = "10:15", D_PD_D = "12:30", D_PD_F = "13:15";
+const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
+const MOTIFS = ["Congé payé","RTT","Férié","Maladie","Sans solde","Formation","Autre"];
+const CONTRATS = ["CDI — 35h","CDI — 39h","CDI — Temps partiel","CDD","CDD — Temps partiel","Apprentissage","Intérim","Autre"];
+const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39,"CDI — Temps partiel":28,CDD:35,"CDD — Temps partiel":28,Apprentissage:35,Intérim:35,Autre:35};
+const MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+const MOIS_C = ["jan.","fév.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
+const MOIS_U = ["JANVIER","FÉVRIER","MARS","AVRIL","MAI","JUIN","JUILLET","AOÛT","SEPTEMBRE","OCTOBRE","NOVEMBRE","DÉCEMBRE"];
+
+// ── Palette ──
+const P = {
+  bg:"#0B1120", bgGrad:"radial-gradient(circle at top,#12213D 0%,#0B1120 60%)",
+  card:"rgba(255,255,255,.05)", glass:"rgba(255,255,255,.07)", glassBorder:"rgba(255,255,255,.12)",
+  glassShadow:"0 8px 32px rgba(0,0,0,.22)", glassBlur:"blur(32px)",
+  teal:"#2DD4A8", tealDim:"rgba(45,212,168,.12)", sky:"#38BDF8", blue:"#3B82F6",
+  orange:"#FBBF24", red:"#EF4444", text:"#FFFFFF", sub:"rgba(255,255,255,.7)",
+  muted:"rgba(255,255,255,.4)", dim:"rgba(255,255,255,.2)", border:"rgba(255,255,255,.08)"
+};
+
+// ── Icons ──
+const sp={fill:"none",strokeWidth:"1.8",strokeLinecap:"round",strokeLinejoin:"round"};
+const IClock=({color=P.muted,size=22})=><svg width={size} height={size} viewBox="0 0 24 24" stroke={color} {...sp}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+const ICalX=({color=P.muted,size=22})=><svg width={size} height={size} viewBox="0 0 24 24" stroke={color} {...sp}><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>;
+const IChart=({color=P.muted,size=22})=><svg width={size} height={size} viewBox="0 0 24 24" stroke={color} {...sp}><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>;
+const IDoc=({size=16})=><svg width={size} height={size} viewBox="0 0 24 24" stroke={P.muted} {...sp}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>;
+const IGear=({size=20})=><svg width={size} height={size} viewBox="0 0 24 24" stroke={P.sub} {...sp}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
+const ICheck=({size=14,color=P.teal})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+
+// ── Helpers ──
+function getSem(d=new Date()){d=new Date(d);d.setHours(0,0,0,0);d.setDate(d.getDate()+3-((d.getDay()+6)%7));const s1=new Date(d.getFullYear(),0,4);return{y:d.getFullYear(),n:1+Math.round(((d-s1)/MS_DAY-3+((s1.getDay()+6)%7))/7)};}
+function getLun(d=new Date()){d=new Date(d);const j=d.getDay();d.setDate(d.getDate()-j+(j===0?-6:1));d.setHours(0,0,0,0);return d;}
+function getLunCle(c){const[a,s]=[parseInt(c.split("-S")[0]),parseInt(c.split("-S")[1])];const j=new Date(a,0,4);const dj=j.getDay()||7;const l=new Date(j);l.setDate(j.getDate()-dj+1+(s-1)*7);l.setHours(0,0,0,0);return l;}
+function cleS(s){return`${s.y}-S${String(s.n).padStart(2,"0")}`;}
+function fU(d){return`${d.getDate()} ${MOIS_U[d.getMonth()]}`;}
+function fC(d){return`${d.getDate()} ${MOIS_C[d.getMonth()]}`;}
+function fF(d){return`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;}
+function t2m(t){if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;}
+function m2h(m){if(m<=0)return"0h00";return`${Math.floor(m/60)}h${String(m%60).padStart(2,"0")}`;}
+function cNet(a,d,cfg){if(!a||!d)return 0;const am=t2m(a),dm=t2m(d);if(dm<=am)return 0;let b=dm-am;const m1=t2m(cfg.pauseMatinHeure||D_PM_H),m2=t2m(cfg.pauseMatinFin||D_PM_F);if(m2>m1&&am<m2&&dm>m1)b-=(Math.min(dm,m2)-Math.max(am,m1));const p1=t2m(cfg.pauseMidiDebut||D_PD_D),p2=t2m(cfg.pauseMidiFin||D_PD_F);if(p2>p1&&am<p2&&dm>p1)b-=(Math.min(dm,p2)-Math.max(am,p1));return Math.max(0,b);}
+function cPause(a,d,cfg){if(!a||!d)return 0;const am=t2m(a),dm=t2m(d);if(dm<=am)return 0;let p=0;const m1=t2m(cfg.pauseMatinHeure||D_PM_H),m2=t2m(cfg.pauseMatinFin||D_PM_F);if(m2>m1&&am<m2&&dm>m1)p+=(Math.min(dm,m2)-Math.max(am,m1));const p1=t2m(cfg.pauseMidiDebut||D_PD_D),p2=t2m(cfg.pauseMidiFin||D_PD_F);if(p2>p1&&am<p2&&dm>p1)p+=(Math.min(dm,p2)-Math.max(am,p1));return p;}
+function tIdx(){const d=new Date().getDay();return d>=1&&d<=5?d-1:-1;}
+function semOff(o){const d=new Date();d.setDate(d.getDate()+o*7);return{s:getSem(d),l:getLun(d)};}
+function salut(){const h=new Date().getHours();return h<12?"Bonjour":h<18?"Bon après-midi":"Bonsoir";}
+function hNow(){const d=new Date();return`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
+
+// ── Storage ──
+const PX="mr_";
+const vide=s=>({cle:cleS(s),valide:false,valideA:null,notes:"",report:null,jours:Array.from({length:5},()=>({arrivee:"",depart:"",absence:false,motif:"",motifAutre:""}))});
+function ldSem(c,n){try{const r=localStorage.getItem(`${PX}${n}_${c}`);if(r){const d=JSON.parse(r);return{cle:d.cle||d.key||c,valide:d.valide!==undefined?d.valide:!!d.v,valideA:d.valideA||d.at||null,notes:d.notes||"",report:d.report||null,jours:(d.jours||d.days||[]).map(j=>({arrivee:j.arrivee||j.a||"",depart:j.depart||j.d||"",absence:j.absence!==undefined?j.absence:!!j.abs,motif:j.motif||j.mot||"",motifAutre:j.motifAutre||j.motA||""}))};}}catch(e){console.warn(e);}return null;}
+function svSem(c,n,d){try{localStorage.setItem(`${PX}${n}_${c}`,JSON.stringify(d));}catch(e){console.warn(e);}}
+function delSem(c,n){try{localStorage.removeItem(`${PX}${n}_${c}`);}catch{}}
+function ldCounter(){try{const v=localStorage.getItem(`${PX}report_counter`);return v?parseInt(v):0;}catch{return 0;}}
+function svCounter(v){try{localStorage.setItem(`${PX}report_counter`,String(v));}catch{}}
+function ldProf(){try{const r=localStorage.getItem(`${PX}prof`);if(r){const p=JSON.parse(r);const matH=p.pauseMatinHeure||D_PM_H;let matF=p.pauseMatinFin;if(!matF&&p.pauseMatinDuree!==undefined){const mf=t2m(matH)+p.pauseMatinDuree;matF=`${String(Math.floor(mf/60)).padStart(2,"0")}:${String(mf%60).padStart(2,"0")}`;}return{nom:p.nom||p.name||"",contrat:p.contrat||"",entreprise:p.entreprise||p.co||"",pointageRapide:p.pointageRapide!==undefined?p.pointageRapide:(p.quickStamp!==undefined?p.quickStamp:true),pauseMatinHeure:matH,pauseMatinFin:matF||D_PM_F,pauseMidiDebut:p.pauseMidiDebut||D_PD_D,pauseMidiFin:p.pauseMidiFin||D_PD_F};}}catch{}return{nom:"",contrat:"",entreprise:"",pointageRapide:true,pauseMatinHeure:D_PM_H,pauseMatinFin:D_PM_F,pauseMidiDebut:D_PD_D,pauseMidiFin:D_PD_F};}
+function svProf(p){try{localStorage.setItem(`${PX}prof`,JSON.stringify(p));}catch{}}
+function allSem(n){try{const pfx=`${PX}${n}_`;return Object.keys(localStorage).filter(k=>k.startsWith(pfx)).map(k=>{const c=k.slice(pfx.length);return{cle:c,data:ldSem(c,n)};}).filter(w=>w.data).sort((a,b)=>b.cle.localeCompare(a.cle));}catch{return[];}}
+function mStats(n,ct,semNum,cfg){const now=new Date();const mo=now.getMonth(),yr=now.getFullYear();const obj=(H_OBJ[ct]||DEF_OBJ)*60;return allSem(n).filter(({cle})=>{const l=getLunCle(cle);return l.getFullYear()===yr&&l.getMonth()===mo;}).map(({cle,data})=>{const tot=data.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,cfg),0);const abs=data.jours.filter(j=>j.absence);const absMotifs={};abs.forEach(j=>{const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+1;});const num=parseInt(cle.split("-S")[1]);return{num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount:abs.length,absMotifs};}).sort((a,b)=>a.num-b.num);}
+
+// ── Time history (frequent times) ──
+function ldHist(){try{const r=localStorage.getItem(`${PX}thist`);return r?JSON.parse(r):[];}catch{return[];}}
+function svHist(arr){try{localStorage.setItem(`${PX}thist`,JSON.stringify(arr.slice(0,8)));}catch{}}
+function addHist(t){if(!t)return;const arr=ldHist();const idx=arr.findIndex(x=>x.t===t);if(idx>=0){arr[idx].c++;arr[idx].u=Date.now();}else{arr.push({t,c:1,u:Date.now()});}arr.sort((a,b)=>b.c-a.c||b.u-a.u);svHist(arr);}
+function getHist(){return ldHist().slice(0,6).map(x=>x.t);}
+
+// ── TimeInput Component ──
+function TimeInput({value,onChange,label,noHistory}){
+  const[focused,setFocused]=useState(false);
+  const[raw,setRaw]=useState("");
+  const[err,setErr]=useState(false);
+  const inputRef=useRef(null);
+  const hist=useMemo(()=>noHistory?[]:getHist(),[focused,noHistory]);
+  
+  const parseDigits=d=>{
+    if(!d)return"";
+    let h,m;
+    if(d.length<=2){h=parseInt(d);m=0;}
+    else if(d.length===3){h=parseInt(d[0]);m=parseInt(d.slice(1));}
+    else{h=parseInt(d.slice(0,2));m=parseInt(d.slice(2));}
+    if(isNaN(h)||isNaN(m)||h>23||m>59)return null;
+    return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+  };
+  
+  const commit=()=>{
+    setFocused(false);setErr(false);
+    if(!raw){if(value)onChange("");return;}
+    const digits=raw.replace(/\D/g,"");
+    const parsed=parseDigits(digits);
+    if(parsed===null){setErr(true);setTimeout(()=>setErr(false),TOAST_MS);return;}
+    if(parsed){onChange(parsed);if(!noHistory)addHist(parsed);}
+  };
+  const handleFocus=()=>{setFocused(true);setErr(false);setRaw(value?value.replace(":",""):"");setTimeout(()=>{if(inputRef.current)inputRef.current.select();},50);};
+  const handleBlur=()=>commit();
+  const handleChange=e=>{setRaw(e.target.value.replace(/\D/g,"").slice(0,4));setErr(false);};
+  const handleKeyDown=e=>{if(e.key==="Enter")e.target.blur();};
+  const clear=()=>{onChange("");setRaw("");setFocused(false);};
+  const pickHist=t=>{onChange(t);if(!noHistory)addHist(t);setRaw(t.replace(":",""));setFocused(false);};
+  
+  const displayVal=focused?raw:(value||"–:–");
+  const hasVal=!!value;
+  
+  return(
+    <div style={{position:"relative"}}>
+      {label&&<div style={st.iL}>{label}</div>}
+      <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+        <input ref={inputRef} type="text" inputMode="numeric" value={displayVal}
+          onFocus={handleFocus} onBlur={handleBlur} onChange={handleChange} onKeyDown={handleKeyDown}
+          style={{...st.tI,color:hasVal?P.text:P.dim,fontVariantNumeric:"tabular-nums",paddingRight:hasVal&&focused?32:12,...(err?{borderColor:P.red}:{})}}
+        />
+        {hasVal&&focused&&<button onMouseDown={e=>{e.preventDefault();clear();}} style={st.clrBtn} aria-label="Effacer">✕</button>}
+      </div>
+      {err&&<div style={{fontSize:10,color:P.red,marginTop:3}}>Heure invalide</div>}
+      {focused&&hist.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+          {hist.map(t=><button key={t} onMouseDown={e=>{e.preventDefault();pickHist(t);}} style={st.chip}>{t}</button>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main App ──
+window.MonReleve=function MonReleve(){
+  const[pr,setPr]=useState(ldProf);
+  const[ok,setOk]=useState(()=>{const p=ldProf();return!!(p.nom&&p.entreprise);});
+  const[ed,setEd]=useState(false);
+  const[off,setOff]=useState(0);
+  const[wd,setWd]=useState(null);
+  const[tab,setTab]=useState("heures");
+  const[msg,setMsg]=useState("");
+  const[pop,setPop]=useState(false);
+  const[arch,setArch]=useState(null);
+  const[cfDel,setCfDel]=useState(false);
+  const[rk,setRk]=useState(0);
+  const[peOpen,setPeOpen]=useState(false);
+  const[notesOpen,setNotesOpen]=useState(false);
+  const[showNews,setShowNews]=useState(()=>{try{return localStorage.getItem(`${PX}last_ver`)!==VERSION;}catch{return false;}});
+  const[showChangelog,setShowChangelog]=useState(false);
+  const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
+
+  const{s:sem,l:lun}=semOff(off);
+  const ck=cleS(sem),ven=new Date(lun.getTime()+4*MS_DAY),cur=off===0,ti=tIdx();
+  const objM=(H_OBJ[pr.contrat]||DEF_OBJ)*60;
+  const isWeekend=ti<0&&cur;
+
+  useEffect(()=>{if(ok&&pr.nom)setWd(ldSem(ck,pr.nom)||vide(sem));},[ck,pr.nom,ok,rk,sem.n,sem.y]);
+
+  const sv=useCallback(d=>{setWd(d);svSem(ck,pr.nom,d);},[ck,pr.nom]);
+  const toastRef=useRef(null);
+  const flash=m=>{setMsg(m);if(toastRef.current)clearTimeout(toastRef.current);toastRef.current=setTimeout(()=>setMsg(""),TOAST_MS);};
+  useEffect(()=>()=>{if(toastRef.current)clearTimeout(toastRef.current);},[]);
+  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";}return u;});sv({...wd,jours:nj});};
+  const pointer=(i,f)=>{mj(i,f,hNow());flash(`${f==="arrivee"?"Arrivée":"Départ"} ${hNow()}`);};
+  const valider=()=>{
+    if(!wd)return;
+    // Compteur de report — figé à la validation
+    const avant=ldCounter();
+    const ecart=totMin-objM;
+    const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
+    const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,avant+reportable));
+    const applique=apres-avant;
+    const report={avant,ecart,applique,apres};
+    svCounter(apres);
+    sv({...wd,valide:true,valideA:new Date().toISOString(),report});
+    setPop(true);flash("Semaine validée ✓");
+  };
+  const setNotes=v=>{if(!wd)return;sv({...wd,notes:v});};
+
+  const totMin=wd?wd.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0):0;
+  const hasD=wd&&wd.jours.some(j=>j.arrivee||j.depart||j.absence);
+  const pct=Math.min(100,Math.round(totMin/objM*100));
+  const prenom=(pr.nom||"").split(" ")[0]||pr.nom;
+  const showQ=pr.pointageRapide!==false;
+
+  // Reorder days: today first when pointage rapide
+  const dayOrder=useMemo(()=>{
+    if(!showQ||!cur||ti<0)return[0,1,2,3,4];
+    const order=[ti];for(let i=0;i<5;i++){if(i!==ti)order.push(i);}return order;
+  },[showQ,cur,ti]);
+
+  // Week status for weekends
+  const weekStatus=useMemo(()=>{
+    if(!isWeekend||!wd)return"";
+    if(wd.valide)return"Relevé envoyé";
+    if(hasD)return"En attente de validation";
+    return"Semaine terminée";
+  },[isWeekend,wd,hasD]);
+
+  const exporter=async()=>{
+    const contenu=JSON.stringify({version:VERSION,profile:ldProf(),weeks:allSem(pr.nom),at:new Date().toISOString()},null,2);
+    const nomFichier=`mon-releve-${pr.nom.replace(/\s+/g,"-")}-${new Date().toISOString().slice(0,10)}.json`;
+    const blob=new Blob([contenu],{type:"application/json"});
+    const enrDate=()=>{const d=new Date().toISOString();try{localStorage.setItem(`${PX}last_backup`,d);}catch{}setLastBackup(d);};
+    if(navigator.share&&navigator.canShare){try{const file=new File([blob],nomFichier,{type:"application/json"});if(navigator.canShare({files:[file]})){await navigator.share({files:[file]});enrDate();flash("Sauvegarde ✓");return;}}catch(e){if(e.name==="AbortError")return;}}
+    const a=document.createElement("a");const url=URL.createObjectURL(blob);a.href=url;a.download=nomFichier;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),DL_MS);enrDate();flash("Sauvegarde ✓");
+  };
+  const restaurer=()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";inp.style.cssText="position:fixed;top:-9999px;left:-9999px;opacity:0";document.body.appendChild(inp);inp.onchange=e=>{const f=e.target.files[0];if(!f){document.body.removeChild(inp);return;}const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||typeof d!=="object"||!d.profile||typeof d.profile!=="object"||!Array.isArray(d.weeks))throw new Error("!");const pn=d.profile.nom||d.profile.name;if(!pn||typeof pn!=="string"||!pn.trim())throw new Error("!");const p={nom:pn.trim(),contrat:d.profile.contrat||"",entreprise:(d.profile.entreprise||d.profile.co||"").trim(),pointageRapide:d.profile.pointageRapide!==undefined?d.profile.pointageRapide:true,pauseMatinHeure:d.profile.pauseMatinHeure||D_PM_H,pauseMatinFin:d.profile.pauseMatinFin||D_PM_F,pauseMidiDebut:d.profile.pauseMidiDebut||D_PD_D,pauseMidiFin:d.profile.pauseMidiFin||D_PD_F};svProf(p);let imported=0;d.weeks.forEach(w=>{if(!w||typeof w!=="object")return;const c=w.cle||w.key;if(!c||typeof c!=="string"||!w.data)return;svSem(c,p.nom,w.data);imported++;});setPr(p);setOk(true);setRk(x=>x+1);flash(`Restauré ✓ (${imported} sem.)`)}catch{flash("Fichier invalide");}document.body.removeChild(inp);};r.onerror=()=>{flash("Erreur de lecture");document.body.removeChild(inp);};r.readAsText(f);};setTimeout(()=>inp.click(),100);};
+
+  const stats=useMemo(()=>ok?mStats(pr.nom,pr.contrat,sem.n,pr):[],[pr.nom,pr.contrat,ok,rk,ck,sem.n,pr.pauseMatinHeure,pr.pauseMatinFin,pr.pauseMidiDebut,pr.pauseMidiFin]);
+  const mTot=stats.reduce((s,w)=>s+w.tot,0),mObj=stats.length*objM,mDiff=mTot-mObj;
+  const mPct=mObj>0?Math.min(100,Math.round(mTot/mObj*100)):0;
+  const mAbsTotal=stats.reduce((s,w)=>s+w.absCount,0);
+  const mAbsDetail=useMemo(()=>{const agg={};stats.forEach(w=>{Object.entries(w.absMotifs).forEach(([m,c])=>{agg[m]=(agg[m]||0)+c;});});return Object.entries(agg).sort((a,b)=>b[1]-a[1]);},[stats]);
+  const archList=useMemo(()=>allSem(pr.nom),[pr.nom,rk,ck,tab,wd]);
+
+  // ── Chart ──
+  const Chart=useMemo(()=>function ChartInner(){
+    if(!stats.length)return<div style={{color:P.muted,fontSize:13,textAlign:"center",padding:20}}>Aucune donnée</div>;
+    const mx=Math.max(...stats.map(s=>Math.max(s.tot,s.obj)));
+    return(<div><div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {stats.map((w,i)=>{const pc=mx>0?Math.round(w.tot/mx*100):0;const op=mx>0?Math.round(w.obj/mx*100):0;const col=w.tot>w.obj?P.teal:(w.cur||!w.v)?P.blue:P.orange;
+        return(<div key={i}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:11,fontWeight:700,color:P.text}}>S{w.num}</span><span style={{fontSize:11,fontWeight:600,color:col}}>{m2h(w.tot)}<span style={{color:P.muted,fontWeight:400}}> / {m2h(w.obj)}</span></span></div>
+          <div style={{height:6,borderRadius:3,background:P.card,position:"relative",overflow:"hidden"}}><div style={{position:"absolute",left:`${op}%`,top:0,bottom:0,width:1.5,background:P.muted,opacity:.4,zIndex:2}}/><div style={{height:"100%",borderRadius:3,background:col,width:`${Math.min(100,pc)}%`,transition:"width .4s"}}/></div></div>);
+      })}</div>
+      <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:10,flexWrap:"wrap"}}>
+        {[["En cours",P.blue],["Heures sup.",P.teal],["Sous objectif",P.orange]].map(([l,c])=>(<div key={l} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:6,height:6,borderRadius:3,background:c}}/><span style={{fontSize:9,color:P.sub}}>{l}</span></div>))}
+      </div></div>);
+  },[stats,sem.n]);
+
+  // ── PDF ──
+  const Releve=({data,ck:ck2,l:l2,v:v2})=>{
+    let cu=0;const pk={bg:"#fff",text:"#111827",sub:"#6B7280",muted:"#9CA3AF",accent:"#0D7377",border:"#E5E7EB",orange:"#D97706"};
+    const cell={padding:"8px 6px",borderBottom:`1px solid ${pk.border}`,borderRight:`1px solid ${pk.border}`,textAlign:"center",fontSize:10,color:pk.text};
+    const cellL={...cell,textAlign:"left",fontWeight:600};const cellEnd={...cell,borderRight:"none"};
+    return(<div id="releve-pdf" style={{background:pk.bg,margin:16,borderRadius:20,padding:20,boxShadow:"0 4px 24px rgba(0,0,0,.2)",fontSize:12,lineHeight:1.6,overflowX:"auto",color:pk.text}}>
+      <div style={{display:"flex",justifyContent:"space-between",paddingBottom:14,borderBottom:`2px solid ${pk.text}`,marginBottom:12}}>
+        <div><div style={{fontSize:15,fontWeight:700,color:pk.text}}>{pr.entreprise}</div><div style={{fontSize:10,color:pk.sub,marginTop:2}}>Relevé d'heures hebdomadaire</div></div>
+        <div style={{textAlign:"right"}}><div style={{fontSize:12,fontWeight:600,color:pk.text}}>{pr.nom}</div><div style={{fontSize:10,color:pk.accent,fontWeight:600,marginTop:2}}>{pr.contrat}</div><div style={{fontSize:11,fontWeight:700,marginTop:4,color:pk.text}}>Semaine {parseInt(ck2.split("-S")[1])}</div><div style={{fontSize:9,color:pk.sub}}>{fF(l2)} — {fF(v2)}</div></div>
+      </div>
+      <table style={{width:"100%",borderCollapse:"collapse",marginTop:6,fontSize:10,border:`1px solid ${pk.border}`}}>
+        <colgroup><col style={{width:"16%"}}/><col style={{width:"22%"}}/><col style={{width:"14%"}}/><col style={{width:"14%"}}/><col style={{width:"14%"}}/><col style={{width:"20%"}}/></colgroup>
+        <thead><tr>{["Jour","Date","Arrivée","Départ","Pause","Net"].map((h,i)=><th key={h} style={{padding:"7px 4px",fontSize:8,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,textAlign:i===0?"left":"center",color:pk.sub,borderBottom:`2px solid ${pk.text}`,borderRight:i<5?`1px solid ${pk.border}`:"none",background:"#F9FAFB"}}>{h}</th>)}</tr></thead>
+        <tbody>
+          {data.jours.map((j,i)=>{const d=new Date(l2);d.setDate(d.getDate()+i);
+            if(j.absence){const mt=j.motif==="Autre"?(j.motifAutre||"Autre"):j.motif;return(<tr key={i} style={{background:"#FFF8F0"}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td colSpan={3} style={{...cell,color:pk.orange,fontWeight:500}}>{mt}</td><td style={{...cellEnd,color:pk.text}}>—</td></tr>);}
+            const n=cNet(j.arrivee,j.depart,pr);cu+=n;
+            return(<tr key={i} style={i%2?{background:"#FAFBFC"}:{}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td style={cell}>{j.arrivee||"—"}</td><td style={cell}>{j.depart||"—"}</td><td style={cell}>{j.arrivee&&j.depart?m2h(cPause(j.arrivee,j.depart,pr)):"—"}</td><td style={{...cellEnd,fontWeight:700}}>{j.arrivee&&j.depart?m2h(n):"—"}</td></tr>);
+          })}
+          <tr style={{background:"#F9FAFB"}}><td colSpan={5} style={{padding:"8px 6px",textAlign:"right",fontWeight:700,borderTop:`2px solid ${pk.text}`,borderBottom:"none",borderRight:`1px solid ${pk.border}`,color:pk.text}}>TOTAL</td><td style={{padding:"8px 6px",fontWeight:800,fontSize:14,borderTop:`2px solid ${pk.text}`,borderBottom:"none",color:pk.text}}>{m2h(cu)}</td></tr>
+        </tbody>
+      </table>
+      {data.notes&&<div style={{fontSize:10,color:pk.text,marginTop:10,padding:"8px 10px",background:"#F9FAFB",borderRadius:8,border:`1px solid ${pk.border}`}}><strong>Note :</strong> {data.notes}</div>}
+      <div style={{fontSize:9,color:pk.muted,marginTop:8}}>Pauses : {pr.pauseMatinHeure||D_PM_H}–{pr.pauseMatinFin||D_PM_F} + {pr.pauseMidiDebut||D_PD_D}–{pr.pauseMidiFin||D_PD_F}</div>
+      {data.report&&<div style={{marginTop:12,padding:"10px 12px",background:"#F0F9FF",borderRadius:8,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
+        <div style={{fontWeight:700,marginBottom:6,color:"#1E40AF"}}>Compteur de report</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+          <span style={{color:pk.sub}}>Objectif hebdo</span><span style={{textAlign:"right"}}>{m2h((H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
+          <span style={{color:pk.sub}}>Heures réalisées</span><span style={{textAlign:"right"}}>{m2h(cu)}</span>
+          <span style={{color:pk.sub}}>Écart semaine</span><span style={{textAlign:"right",color:data.report.ecart>=0?"#059669":"#DC2626"}}>{data.report.ecart>=0?"+":""}{m2h(Math.abs(data.report.ecart))}</span>
+          <span style={{color:pk.sub}}>Compteur précédent</span><span style={{textAlign:"right"}}>{data.report.avant>=0?"+":""}{m2h(Math.abs(data.report.avant))}</span>
+          <span style={{color:pk.sub}}>Report appliqué</span><span style={{textAlign:"right",fontWeight:600}}>{data.report.applique>=0?"+":""}{m2h(Math.abs(data.report.applique))}</span>
+          <span style={{color:pk.sub,fontWeight:700}}>Compteur actuel</span><span style={{textAlign:"right",fontWeight:700,color:"#1E40AF"}}>{data.report.apres>=0?"+":""}{m2h(Math.abs(data.report.apres))}</span>
+        </div>
+      </div>}
+      {data.valideA&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
+      <div style={{display:"flex",gap:14,marginTop:20}}><div style={{flex:1,border:`1px solid ${pk.border}`,borderRadius:10,padding:12,minHeight:50}}><div style={{fontSize:8,color:pk.muted,textTransform:"uppercase",letterSpacing:.5}}>Signature salarié</div></div><div style={{flex:1,border:`1px solid ${pk.border}`,borderRadius:10,padding:12,minHeight:50}}><div style={{fontSize:8,color:pk.muted,textTransform:"uppercase",letterSpacing:.5}}>Signature responsable</div></div></div>
+      <div style={{fontSize:8,color:pk.muted,marginTop:10,textAlign:"right"}}>Mon Relevé v{VERSION}</div>
+    </div>);
+  };
+
+  // ── Setup ──
+  if(!ok||ed){
+    return(
+    <div style={st.app}><div style={st.setup}>
+      <IClock color={P.teal} size={44}/>
+      <h1 style={{fontSize:26,fontWeight:800,color:P.text,margin:"6px 0 0"}}>Mon Relevé</h1>
+      <p style={{fontSize:13,color:P.sub,marginBottom:16}}>Votre suivi d'heures personnel</p>
+      <div style={st.sCard}>
+        <div style={st.fg}><label style={st.fl}>Entreprise</label><input type="text" placeholder="Nom" value={pr.entreprise||""} onChange={e=>setPr({...pr,entreprise:e.target.value})} style={st.fi} autoFocus/></div>
+        <div style={st.fg}><label style={st.fl}>Nom complet</label><input type="text" placeholder="Prénom Nom" value={pr.nom} onChange={e=>setPr({...pr,nom:e.target.value})} style={st.fi}/></div>
+        <div style={st.fg}><label style={st.fl}>Contrat</label><select value={pr.contrat} onChange={e=>setPr({...pr,contrat:e.target.value})} style={st.fs}><option value="">— Sélectionner —</option>{CONTRATS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:`1px solid ${P.border}`}}>
+          <div><div style={{fontSize:13,fontWeight:600,color:P.text}}>Pointage rapide</div><div style={{fontSize:11,color:P.sub,marginTop:2}}>Arrivée / Départ du jour</div></div>
+          <button onClick={()=>setPr({...pr,pointageRapide:!pr.pointageRapide})} style={{width:51,height:31,borderRadius:16,border:"none",cursor:"pointer",position:"relative",background:pr.pointageRapide!==false?P.teal:P.dim,transition:"background .2s"}}><div style={{width:27,height:27,borderRadius:14,background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,.3)",position:"absolute",top:2,left:pr.pointageRapide!==false?22:2,transition:"left .2s"}}/></button>
+        </div>
+        {/* Compact pause settings */}
+        <div style={{paddingTop:14,marginTop:14,borderTop:`1px solid ${P.border}`}}>
+          <button onClick={()=>setPeOpen(!peOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+            <div style={{textAlign:"left"}}>
+              <div style={{fontSize:13,fontWeight:600,color:P.text}}>Pauses déduites</div>
+              {!peOpen&&<div style={{fontSize:11,color:P.sub,marginTop:2}}>{pr.pauseMatinHeure||D_PM_H} → {pr.pauseMatinFin||D_PM_F} · {pr.pauseMidiDebut||D_PD_D} → {pr.pauseMidiFin||D_PD_F}</div>}
+            </div>
+            <span style={{color:P.sub,fontSize:16,transform:peOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+          </button>
+          {peOpen&&<div style={{marginTop:12}}>
+            <div style={{...GL,borderRadius:16,padding:12,marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:600,color:P.text,marginBottom:8}}>Pause matin</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"start"}}>
+                <TimeInput value={pr.pauseMatinHeure||D_PM_H} onChange={v=>setPr({...pr,pauseMatinHeure:v||D_PM_H})} label="Début" noHistory/>
+                <div style={{color:P.dim,marginTop:22,fontSize:12}}>→</div>
+                <TimeInput value={pr.pauseMatinFin||D_PM_F} onChange={v=>setPr({...pr,pauseMatinFin:v||D_PM_F})} label="Fin" noHistory/>
+              </div>
+            </div>
+            <div style={{...GL,borderRadius:16,padding:12}}>
+              <div style={{fontSize:12,fontWeight:600,color:P.text,marginBottom:8}}>Pause midi</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"start"}}>
+                <TimeInput value={pr.pauseMidiDebut||D_PD_D} onChange={v=>setPr({...pr,pauseMidiDebut:v||D_PD_D})} label="Début" noHistory/>
+                <div style={{color:P.dim,marginTop:22,fontSize:12}}>→</div>
+                <TimeInput value={pr.pauseMidiFin||D_PD_F} onChange={v=>setPr({...pr,pauseMidiFin:v||D_PD_F})} label="Fin" noHistory/>
+              </div>
+            </div>
+          </div>}
+        </div>
+      </div>
+      <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
+      {ok&&<button onClick={()=>setEd(false)} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
+      {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
+      <button onClick={()=>setShowChangelog(true)} style={{background:"none",border:"none",cursor:"pointer",padding:8,marginTop:8}}>
+        <span style={{fontSize:10,color:P.dim}}>v{VERSION}</span>
+        <span style={{fontSize:9,color:P.muted,marginLeft:6}}>Nouveautés ›</span>
+      </button>
+    </div></div>);
+  }
+
+  // ── Loading guard ──
+  if(!wd)return<div style={st.app}><div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}><IClock color={P.teal} size={32}/></div></div>;
+
+  // ── Validation popup ──
+  if(pop&&wd){return(
+    <div style={st.app}>
+      <div style={st.topBar}><button onClick={()=>setPop(false)} style={st.topBtn}>← Retour</button></div>
+      <Releve data={wd} ck={ck} l={lun} v={ven}/>
+      <div style={{padding:"0 16px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+        <button onClick={()=>window.print()} style={{...st.cta,width:"100%",maxWidth:280}}>Exporter en PDF</button>
+        <p style={{fontSize:11,color:P.sub,textAlign:"center"}}>Enregistrez le PDF puis partagez-le par mail ou AirDrop.</p>
+      </div>
+    </div>
+  );}
+
+  // ── Archive detail ──
+  if(arch){const al=getLunCle(arch.cle);return(
+    <div style={st.app}>
+      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);}} style={st.topBtn}>← Historique</button><button onClick={()=>window.print()} style={st.topAct}>PDF</button></div>
+      <Releve data={arch.data} ck={arch.cle} l={al} v={new Date(al.getTime()+4*MS_DAY)}/>
+      <div style={{padding:"0 16px 32px"}}>
+        {!cfDel?<button onClick={()=>setCfDel(true)} style={{...st.sec,width:"100%",color:P.red}}>Supprimer ce relevé</button>
+          :<div style={{background:"rgba(239,68,68,.1)",borderRadius:18,padding:16}}>
+            <div style={{fontSize:13,fontWeight:600,color:P.text,textAlign:"center",marginBottom:12}}>Supprimer la semaine {parseInt(arch.cle.split("-S")[1])} ?</div>
+            <div style={{display:"flex",gap:10}}><button onClick={()=>setCfDel(false)} style={{...st.sec,flex:1}}>Annuler</button><button onClick={()=>{delSem(arch.cle,pr.nom);setArch(null);setCfDel(false);setRk(x=>x+1);flash("Supprimé");}} style={{...st.sec,flex:1,background:P.red,color:"#fff"}}>Supprimer</button></div>
+          </div>}
+      </div>
+    </div>
+  );}
+
+  // ── Main ──
+  const dismissNews=()=>{setShowNews(false);try{localStorage.setItem(`${PX}last_ver`,VERSION);}catch{}};
+  const NewsPopup=({onClose})=>(
+    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+      <div style={{...GL,borderRadius:28,padding:28,maxWidth:340,width:"100%",textAlign:"center"}}>
+        <div style={{fontSize:36,marginBottom:8}}>🎉</div>
+        <div style={{fontSize:20,fontWeight:800,color:P.text,marginBottom:4}}>Version {VERSION}</div>
+        <div style={{fontSize:12,color:P.sub,marginBottom:20}}>Nouveautés</div>
+        <div style={{textAlign:"left",marginBottom:24}}>{CHANGELOG.map((item,i)=>(
+          <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:10}}>
+            <span style={{color:P.teal,fontSize:14,lineHeight:1,marginTop:1}}>✓</span>
+            <span style={{fontSize:13,color:P.text,lineHeight:1.4}}>{item}</span>
+          </div>
+        ))}</div>
+        <button onClick={onClose} style={{...st.cta,width:"100%"}}>Compris</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={st.app}>
+      {msg&&<div style={st.toast}>{msg}</div>}
+      {showNews&&ok&&<NewsPopup onClose={dismissNews}/>}
+      {showChangelog&&<NewsPopup onClose={()=>setShowChangelog(false)}/>}
+
+      {/* Header compact */}
+      <div style={st.header}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div>
+            <div style={{fontSize:14,color:P.sub,fontWeight:500}}>{salut()}</div>
+            <div style={{fontSize:22,fontWeight:800,color:P.text,marginTop:1}}>{prenom}</div>
+          </div>
+          <button onClick={()=>setEd(true)} style={st.gearBtn}><IGear/></button>
+        </div>
+        <div style={{background:P.card,borderRadius:12,padding:"8px 4px",border:`1px solid ${P.border}`}}>
+          <div style={st.wRow}>
+            <button onClick={()=>setOff(o=>o-1)} style={st.wA}>◀</button>
+            <div style={{flex:1,textAlign:"center"}}>
+              <div style={{fontSize:12,fontWeight:800,color:P.teal,letterSpacing:1.5}}>SEMAINE {sem.n}</div>
+              <div style={{fontSize:11,color:P.sub,marginTop:1}}>{fU(lun)} – {fU(ven)}</div>
+            </div>
+            <button onClick={()=>setOff(o=>o+1)} style={st.wA}>▶</button>
+          </div>
+        </div>
+      </div>
+
+      {!cur&&<div style={{padding:"0 16px"}}><button onClick={()=>setOff(0)} style={st.offW}>Revenir à la semaine en cours</button></div>}
+
+      {/* Summary compact */}
+      <div style={{padding:"8px 16px 0"}}>
+        <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+            <div>
+              <div style={{fontSize:10,color:P.sub,fontWeight:500,textTransform:"uppercase",letterSpacing:.5}}>Temps déclaré</div>
+              <div style={{fontSize:34,fontWeight:800,color:P.text,letterSpacing:-2,marginTop:2}}>{m2h(totMin)}</div>
+            </div>
+            <div style={{textAlign:"right",marginBottom:4}}>
+              <div style={{fontSize:13,color:P.muted}}>sur {H_OBJ[pr.contrat]||DEF_OBJ}h</div>
+              <div style={{fontSize:11,color:P.sub}}>prévues</div>
+            </div>
+          </div>
+          <div style={{marginTop:8,height:5,borderRadius:3,background:P.card,overflow:"hidden"}}>
+            <div style={{height:"100%",borderRadius:3,background:pct>=100?P.teal:P.blue,width:`${pct}%`,transition:"width .4s"}}/>
+          </div>
+          <div style={{marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              {isWeekend&&weekStatus?(<><div style={{width:7,height:7,borderRadius:4,background:wd.valide?P.teal:P.blue}}/><span style={{fontSize:11,fontWeight:600,color:wd.valide?P.teal:P.blue}}>{weekStatus}</span></>)
+              :wd.valide?(<><div style={{width:7,height:7,borderRadius:4,background:P.teal}}/><span style={{fontSize:11,fontWeight:600,color:P.teal}}>Envoyé</span></>)
+              :(<><div style={{width:7,height:7,borderRadius:4,background:P.orange}}/><span style={{fontSize:11,fontWeight:600,color:P.orange}}>Non envoyé</span></>)}
+            </div>
+            {(()=>{const jc=wd.jours.filter(j=>!j.absence&&(j.arrivee||j.depart)).length;return<span style={{fontSize:10,color:P.muted}}>{jc} jour{jc>1?"s":""} saisis</span>;})()}
+          </div>
+        </div>
+      </div>
+
+      <div style={st.body}>
+        {/* ── TAB HEURES ── */}
+        {tab==="heures"&&(<>
+          {dayOrder.map(i=>{
+            const j=wd.jours[i];
+            if(j.absence)return<div key={i} style={st.dc}><div style={st.dRow}><span style={st.dN}>{JOURS[i]}</span><span style={st.absP}>{j.motif==="Autre"?(j.motifAutre||"Absence"):j.motif}</span></div></div>;
+            const n=cNet(j.arrivee,j.depart,pr);const isT=cur&&i===ti&&!isWeekend;const ok2=j.arrivee&&j.depart;
+            return(<div key={i} style={{...st.dc,...(isT?{border:`1.5px solid ${P.teal}`,boxShadow:`0 0 16px ${P.teal}15`}:{})}}>
+              <div style={st.dRow}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={st.dN}>{JOURS[i]}</span>
+                  {isT&&<span style={{fontSize:8,fontWeight:700,color:P.teal,background:P.tealDim,padding:"2px 7px",borderRadius:8}}>Aujourd'hui</span>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  {isT&&showQ&&!j.arrivee&&<button onClick={()=>pointer(i,"arrivee")} style={st.punchBtn}>↓</button>}
+                  {isT&&showQ&&j.arrivee&&!j.depart&&<button onClick={()=>pointer(i,"depart")} style={{...st.punchBtn,borderColor:`${P.blue}40`}}>↑</button>}
+                  {ok2&&<span style={st.netP}>{m2h(n)}</span>}
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"start",marginTop:6}}>
+                <TimeInput value={j.arrivee} onChange={v=>mj(i,"arrivee",v)} label="Arrivée"/>
+                <div style={{color:P.dim,marginTop:22,fontSize:12}}>→</div>
+                <TimeInput value={j.depart} onChange={v=>mj(i,"depart",v)} label="Départ"/>
+              </div>
+              {ok2&&<div style={{fontSize:11,color:P.sub,marginTop:4}}>Pause {m2h(cPause(j.arrivee,j.depart,pr))} · Net {m2h(n)}</div>}
+            </div>);
+          })}
+          <div style={{fontSize:11,color:P.muted,textAlign:"center",marginTop:4,marginBottom:4}}>Pauses : {pr.pauseMatinHeure||D_PM_H}–{pr.pauseMatinFin||D_PM_F} + {pr.pauseMidiDebut||D_PD_D}–{pr.pauseMidiFin||D_PD_F}</div>
+          {/* Notes de semaine — accordéon */}
+          <div style={{marginTop:4,marginBottom:70}}>
+            <div style={{...GL,borderRadius:16,padding:"10px 14px"}}>
+              <button onClick={()=>setNotesOpen(!notesOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+                <div style={{fontSize:11,fontWeight:600,color:P.sub}}>Notes de semaine {wd.notes?<span style={{color:P.teal,fontSize:9,marginLeft:4}}>●</span>:null}</div>
+                <span style={{color:P.sub,fontSize:14,transform:notesOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+              </button>
+              {notesOpen&&<textarea value={wd.notes||""} onChange={e=>setNotes(e.target.value)} placeholder="Salon, événement, déplacement, réunion client…" rows={2} style={{width:"100%",background:"none",border:"none",color:P.text,fontSize:12,resize:"vertical",outline:"none",lineHeight:1.5,fontFamily:"inherit",marginTop:8}}/>}
+            </div>
+          </div>
+        </>)}
+
+        {/* ── TAB ABSENCES ── */}
+        {tab==="absences"&&(<>
+          <p style={{fontSize:12,color:P.sub,marginBottom:12}}>Sélectionnez les jours d'absence.</p>
+          {wd.jours.map((j,i)=>(<div key={i} style={{...st.dc,padding:"12px 14px"}}>
+            <label style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+              <input type="checkbox" checked={j.absence} onChange={e=>mj(i,"absence",e.target.checked)} style={{width:20,height:20,accentColor:P.teal,flexShrink:0}}/>
+              <span style={{fontWeight:600,fontSize:14,color:P.text}}>{JOURS[i]}</span>
+            </label>
+            {j.absence&&(<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>mj(i,"motif",m)} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
+              {j.motif==="Autre"&&<input type="text" placeholder="Précisez…" value={j.motifAutre} onChange={e=>mj(i,"motifAutre",e.target.value)} style={{...st.fi,marginTop:8,padding:"10px 14px",fontSize:13}}/>}
+            </div>)}
+          </div>))}
+        </>)}
+
+        {/* ── TAB HISTORIQUE ── */}
+        {tab==="historique"&&(<>
+          {/* Compteur de report */}
+          {(()=>{const cnt=ldCounter();return cnt!==0?(
+            <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:11,color:P.sub,textTransform:"uppercase",letterSpacing:.5}}>Compteur de report</div></div>
+                <div style={{fontSize:22,fontWeight:800,color:cnt>0?P.teal:P.orange}}>{cnt>=0?"+":""}{m2h(Math.abs(cnt))}</div>
+              </div>
+              <div style={{marginTop:6,height:4,borderRadius:2,background:P.card,overflow:"hidden",position:"relative"}}>
+                <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:1,background:P.dim}}/>
+                <div style={{height:"100%",borderRadius:2,background:cnt>0?P.teal:P.orange,width:`${Math.min(100,Math.abs(cnt)/REPORT_GLOBAL_CAP*50)}%`,marginLeft:cnt>=0?"50%":"auto",marginRight:cnt<0?"50%":"auto",transition:"width .4s"}}/>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>-{m2h(REPORT_GLOBAL_CAP)}</span><span style={{fontSize:9,color:P.dim}}>0</span><span style={{fontSize:9,color:P.muted}}>+{m2h(REPORT_GLOBAL_CAP)}</span></div>
+            </div>
+          ):null;})()}
+          <div style={{fontSize:16,fontWeight:700,color:P.text,marginBottom:3}}>{MOIS[new Date().getMonth()]}</div>
+          <div style={{fontSize:12,color:P.sub,marginBottom:10}}>Synthèse mensuelle</div>
+          <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+              <div><div style={{fontSize:10,color:P.sub,textTransform:"uppercase",letterSpacing:.5}}>Cumulé</div><div style={{fontSize:28,fontWeight:800,color:P.text,marginTop:2,letterSpacing:-1}}>{m2h(mTot)}</div></div>
+              <div style={{textAlign:"right",marginBottom:2}}><div style={{fontSize:13,color:P.muted}}>sur {m2h(mObj)}</div><div style={{fontSize:10,color:P.sub,marginTop:1}}>{stats.length} sem.</div></div>
+            </div>
+            <div style={{marginTop:10,height:6,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span style={{fontSize:10,color:P.muted}}>{mPct}%</span><span style={{fontSize:10,color:P.muted}}>{m2h(mObj)}</span></div>
+            {stats.length>0&&(<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:12,background:mDiff>0?P.tealDim:mDiff<0?"rgba(251,191,36,.08)":"rgba(59,130,246,.08)",marginTop:8}}>
+              <div style={{width:7,height:7,borderRadius:4,background:mDiff>0?P.teal:mDiff<0?P.orange:P.blue}}/>
+              <span style={{fontSize:12,fontWeight:600,color:mDiff>0?P.teal:mDiff<0?P.orange:P.blue}}>{mDiff>0?`+${m2h(mDiff)} heures sup.`:mDiff<0?`${m2h(Math.abs(mDiff))} restantes`:"Objectif atteint"}</span>
+            </div>)}
+            {mAbsTotal>0&&(<div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:12,fontWeight:600,color:P.text}}>Absences</span><span style={{fontSize:12,fontWeight:700,color:P.orange}}>{mAbsTotal}j</span></div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(251,191,36,.06)",padding:"4px 10px",borderRadius:999,border:`1px solid rgba(251,191,36,.12)`}}><span style={{fontSize:11,fontWeight:600,color:P.orange}}>{count}</span><span style={{fontSize:11,color:P.sub}}>{motif}</span></div>))}</div>
+            </div>)}
+          </div>
+          {stats.length>0&&<div style={{...GL,borderRadius:24,padding:"14px 18px",marginTop:10}}><div style={{fontSize:12,fontWeight:600,color:P.text,marginBottom:10}}>Heures par semaine</div><Chart/></div>}
+          <div style={{marginTop:12,fontSize:14,fontWeight:700,color:P.text,marginBottom:8}}>Tous les relevés</div>
+          {archList.length===0&&<div style={{color:P.muted,fontSize:13,padding:30,textAlign:"center"}}>Aucun relevé</div>}
+          {archList.map(({cle:c,data:d})=>{
+            const wt=d.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0);
+            const al=getLunCle(c);const av=new Date(al.getTime()+4*MS_DAY);
+            return(<button key={c} onClick={()=>setArch({cle:c,data:d})} style={st.archI}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:20,fontWeight:800,color:P.text}}>{m2h(wt)}</div>
+                <div style={{fontSize:12,color:P.sub,marginTop:1}}>{fC(al)} – {fC(av)}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>{d.valide&&<ICheck size={12}/>}<span style={{fontSize:10,fontWeight:600,color:P.teal,letterSpacing:.5}}>S{parseInt(c.split("-S")[1])}</span><span style={{color:P.dim,fontSize:18}}>›</span></div>
+            </button>);
+          })}
+          {/* Sécurité des données */}
+          <div style={{marginTop:20}}>
+            <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span style={{fontSize:14,fontWeight:700,color:P.text}}>Sécurité des données</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:12,background:lastBackup?P.tealDim:"rgba(251,191,36,.08)",marginBottom:12}}>
+                <div style={{width:7,height:7,borderRadius:4,background:lastBackup?P.teal:P.orange}}/>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,color:lastBackup?P.teal:P.orange}}>{lastBackup?"Dernière sauvegarde":"Aucune sauvegarde"}</div>
+                  {lastBackup&&<div style={{fontSize:10,color:P.sub,marginTop:1}}>{new Date(lastBackup).toLocaleDateString("fr-FR")} à {new Date(lastBackup).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
+                </div>
+              </div>
+              <button onClick={exporter} style={{...st.cta,width:"100%",height:44,fontSize:13,marginBottom:8}}>Sauvegarder</button>
+              <button onClick={restaurer} style={{...st.sec,width:"100%",fontSize:12,padding:"10px 16px"}}>Restaurer</button>
+              <div style={{fontSize:10,color:P.muted,lineHeight:1.5,textAlign:"center",marginTop:8}}>{/iPhone|iPad|iPod/.test(navigator.userAgent)?"Conservez votre sauvegarde dans iCloud Drive.":/Android/.test(navigator.userAgent)?"Conservez votre sauvegarde dans Google Drive.":"Conservez dans iCloud Drive ou Google Drive."}</div>
+            </div>
+          </div>
+        </>)}
+      </div>
+
+      {tab==="heures"&&hasD&&<div style={st.fCTA}><button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button></div>}
+
+      {/* Tab bar with active green bg */}
+      <div style={st.tabBar}>
+        <div style={st.tabIn}>
+          {[{id:"heures",l:"Heures"},{id:"absences",l:"Absences"},{id:"historique",l:"Historique"}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{...st.tabB,...(tab===t.id?st.tabA:{})}}>
+              {t.id==="heures"&&<IClock color={tab===t.id?P.teal:P.muted} size={20}/>}
+              {t.id==="absences"&&<ICalX color={tab===t.id?P.teal:P.muted} size={20}/>}
+              {t.id==="historique"&&<IChart color={tab===t.id?P.teal:P.muted} size={20}/>}
+              <span style={{fontSize:10,fontWeight:tab===t.id?700:400}}>{t.l}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Styles ──
+const TR="transform .25s cubic-bezier(.2,.8,.2,1), opacity .25s ease, background-color .25s ease, border-color .25s ease";
+const GL={background:"linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04))",backdropFilter:P.glassBlur,WebkitBackdropFilter:P.glassBlur,border:`1px solid ${P.glassBorder}`,boxShadow:P.glassShadow};
+const st={
+  app:{fontFamily:"-apple-system,'SF Pro Display','Inter',sans-serif",background:P.bgGrad,minHeight:"100vh",maxWidth:520,margin:"0 auto",position:"relative",WebkitFontSmoothing:"antialiased",paddingBottom:90,color:P.text},
+  setup:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:24,gap:8},
+  sCard:{width:"100%",padding:24,borderRadius:28,...GL,marginBottom:20},
+  fg:{marginBottom:14},
+  fl:{fontSize:12,fontWeight:500,color:P.sub,display:"block",marginBottom:6,letterSpacing:.3},
+  fi:{width:"100%",padding:"12px 14px",fontSize:14,border:`1px solid ${P.border}`,borderRadius:14,outline:"none",background:"rgba(255,255,255,.04)",color:P.text,boxSizing:"border-box",transition:TR},
+  fs:{width:"100%",padding:"12px 14px",fontSize:14,border:`1px solid ${P.border}`,borderRadius:14,outline:"none",background:"rgba(255,255,255,.04)",color:P.text,boxSizing:"border-box",transition:TR},
+  header:{background:"linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03))",backdropFilter:P.glassBlur,WebkitBackdropFilter:P.glassBlur,borderBottom:`1px solid ${P.glassBorder}`,padding:"14px 18px 12px"},
+  gearBtn:{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,.06)",border:`1px solid ${P.glassBorder}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:TR},
+  wRow:{display:"flex",alignItems:"center",gap:6},
+  wA:{width:32,height:32,borderRadius:10,background:"none",border:"none",color:P.sub,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:TR},
+  offW:{width:"100%",marginTop:10,padding:"10px 14px",borderRadius:16,border:"none",background:"rgba(251,191,36,.07)",color:P.orange,fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"center",transition:TR},
+  body:{padding:"12px 16px",paddingBottom:0},
+  dc:{...GL,borderRadius:20,padding:"12px 14px",marginBottom:10,transition:TR},
+  dRow:{display:"flex",justifyContent:"space-between",alignItems:"center"},
+  dN:{fontSize:15,fontWeight:700,color:P.text,letterSpacing:.2},
+  netP:{fontSize:12,fontWeight:700,color:P.teal,background:P.tealDim,padding:"4px 12px",borderRadius:999},
+  absP:{fontSize:11,fontWeight:600,color:P.orange,background:"rgba(251,191,36,.08)",padding:"4px 12px",borderRadius:999},
+  iL:{fontSize:9,fontWeight:600,color:P.sub,textTransform:"uppercase",letterSpacing:.5,marginBottom:5},
+  tI:{display:"block",width:"100%",maxWidth:"100%",padding:"10px 12px",fontSize:15,fontWeight:600,border:`1px solid ${P.border}`,borderRadius:12,background:"rgba(255,255,255,.04)",outline:"none",textAlign:"center",boxSizing:"border-box",color:P.text,fontFamily:"inherit",transition:TR},
+  clrBtn:{position:"absolute",top:"50%",right:8,transform:"translateY(-50%)",width:22,height:22,borderRadius:11,border:"none",background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.5)",fontSize:10,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,lineHeight:1,zIndex:2},
+  chip:{padding:"5px 12px",borderRadius:999,border:`1px solid ${P.border}`,background:"rgba(255,255,255,.04)",color:P.sub,fontSize:12,fontWeight:500,cursor:"pointer",transition:TR},
+  punchBtn:{width:28,height:28,borderRadius:14,...GL,border:`1.5px solid ${P.teal}40`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:P.teal,padding:0,transition:TR},
+  mP:{padding:"8px 14px",borderRadius:999,border:"none",background:"rgba(255,255,255,.06)",color:P.text,fontSize:12,fontWeight:500,cursor:"pointer",textAlign:"center",transition:TR},
+  archI:{width:"100%",display:"flex",alignItems:"center",padding:"14px 18px",...GL,borderRadius:20,marginBottom:10,cursor:"pointer",textAlign:"left",transition:TR},
+  cta:{padding:"0 28px",borderRadius:999,border:"none",background:`linear-gradient(135deg, ${P.sky}, ${P.teal})`,backgroundImage:`linear-gradient(180deg, rgba(255,255,255,.15), transparent), linear-gradient(135deg, ${P.sky}, ${P.teal})`,color:P.bg,fontSize:14,fontWeight:700,cursor:"pointer",textAlign:"center",height:48,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 24px rgba(45,212,168,.20)",letterSpacing:.3,transition:TR},
+  sec:{padding:"12px 16px",borderRadius:16,border:`1px solid ${P.glassBorder}`,background:"rgba(255,255,255,.05)",color:P.text,fontSize:13,fontWeight:500,cursor:"pointer",textAlign:"center",transition:TR},
+  fCTA:{position:"fixed",bottom:110,left:0,right:0,padding:"0 90px",zIndex:40,maxWidth:520,margin:"0 auto"},
+  toast:{position:"fixed",bottom:158,left:"50%",transform:"translateX(-50%)",...GL,color:P.text,padding:"12px 24px",borderRadius:30,fontSize:12,fontWeight:600,zIndex:100,boxShadow:"0 12px 40px rgba(0,0,0,.28)"},
+  topBar:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",background:"linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03))",backdropFilter:P.glassBlur,WebkitBackdropFilter:P.glassBlur,borderBottom:`1px solid ${P.glassBorder}`},
+  topBtn:{background:"none",border:"none",fontSize:15,fontWeight:600,color:P.teal,cursor:"pointer",padding:"6px 0",transition:TR},
+  topAct:{padding:"8px 16px",borderRadius:12,border:"none",backgroundImage:`linear-gradient(180deg, rgba(255,255,255,.15), transparent), linear-gradient(135deg, ${P.sky}, ${P.teal})`,color:P.bg,fontSize:12,fontWeight:700,cursor:"pointer",transition:TR},
+  tabBar:{position:"fixed",bottom:0,left:0,right:0,display:"flex",justifyContent:"center",padding:"8px 20px 30px",zIndex:50,pointerEvents:"none"},
+  tabIn:{display:"flex",background:"rgba(18,33,61,.65)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:999,boxShadow:"0 8px 32px rgba(0,0,0,.3)",border:"1px solid rgba(255,255,255,.08)",padding:"4px 6px",pointerEvents:"auto",maxWidth:320,width:"100%",gap:2},
+  tabB:{flex:1,padding:"8px 4px 6px",border:"none",background:"none",cursor:"pointer",color:P.muted,display:"flex",flexDirection:"column",alignItems:"center",gap:2,borderRadius:999,transition:"all .3s cubic-bezier(.2,.8,.2,1)"},
+  tabA:{color:P.teal,background:"rgba(45,212,168,.1)"},
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(window.MonReleve));
+</script>
+<script>
+(function(){
+  if(!('serviceWorker' in navigator))return;
+  navigator.serviceWorker.register('./sw.js').then(function(reg){
+    reg.addEventListener('updatefound',function(){var nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',function(){if(nw.state==='installed'&&navigator.serviceWorker.controller){nw.postMessage({type:'SKIP_WAITING'});}});});
+  }).catch(function(){});
+  navigator.serviceWorker.addEventListener('message',function(e){if(e.data&&e.data.type==='SW_UPDATED')window.location.reload();});
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(function(reg){reg.update();});}});
+})();
+</script>
+</body>
+</html>
