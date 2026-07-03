@@ -111,10 +111,21 @@ function delSem(c,n){try{localStorage.removeItem(`${PX}${n}_${c}`);}catch{}}
 function ldCounter(){try{const v=localStorage.getItem(`${PX}report_counter`);return v?parseInt(v):0;}catch{return 0;}}
 function svCounter(v){try{localStorage.setItem(`${PX}report_counter`,String(v));}catch{}}
 function recalcCounter(n){
-  // Recalcule le compteur en rejouant tous les reports validés dans l'ordre chronologique
-  const weeks=allSem(n).filter(w=>w.data&&w.data.report).sort((a,b)=>a.cle.localeCompare(b.cle));
+  // Recalcule le compteur ET corrige les reports stockés depuis les heures réelles
+  const cfg=ldProf();
+  const objM=(H_OBJ[cfg.contrat]||DEF_OBJ)*60;
+  const weeks=allSem(n).filter(w=>w.data&&w.data.valide).sort((a,b)=>a.cle.localeCompare(b.cle));
   let cnt=0;
-  weeks.forEach(w=>{cnt=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+w.data.report.applique));});
+  weeks.forEach(w=>{
+    const tot=w.data.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,cfg),0);
+    const ecart=tot-objM;
+    const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
+    const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+reportable));
+    const applique=apres-cnt;
+    w.data.report={avant:cnt,ecart,applique,apres};
+    svSem(w.cle,n,w.data);
+    cnt=apres;
+  });
   svCounter(cnt);
   return cnt;
 }
