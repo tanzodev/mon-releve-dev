@@ -194,6 +194,7 @@ window.MonReleve=function MonReleve(){
   const[notesOpen,setNotesOpen]=useState(false);
   const[showNews,setShowNews]=useState(()=>{try{return localStorage.getItem(`${PX}last_ver`)!==VERSION;}catch{return false;}});
   const[showChangelog,setShowChangelog]=useState(false);
+  const[guideOpen,setGuideOpen]=useState(false);
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
 
   const{s:sem,l:lun}=semOff(off);
@@ -211,7 +212,6 @@ window.MonReleve=function MonReleve(){
   const pointer=(i,f)=>{mj(i,f,hNow());flash(`${f==="arrivee"?"Arrivée":"Départ"} ${hNow()}`);};
   const valider=()=>{
     if(!wd)return;
-    // Compteur de report — figé à la validation
     const avant=ldCounter();
     const ecart=totMin-objM;
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
@@ -221,6 +221,13 @@ window.MonReleve=function MonReleve(){
     svCounter(apres);
     sv({...wd,valide:true,valideA:new Date().toISOString(),report});
     setPop(true);flash("Semaine validée ✓");
+  };
+  const deverrouiller=()=>{
+    if(!wd||!wd.valide)return;
+    // Annuler le report de cette semaine dans le compteur
+    if(wd.report){const cnt=ldCounter();svCounter(cnt-wd.report.applique);}
+    sv({...wd,valide:false,valideA:null,report:null});
+    flash("Relevé déverrouillé");
   };
   const setNotes=v=>{if(!wd)return;sv({...wd,notes:v});};
 
@@ -304,10 +311,10 @@ window.MonReleve=function MonReleve(){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
           <span style={{color:pk.sub}}>Objectif hebdo</span><span style={{textAlign:"right"}}>{m2h((H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
           <span style={{color:pk.sub}}>Heures réalisées</span><span style={{textAlign:"right"}}>{m2h(cu)}</span>
-          <span style={{color:pk.sub}}>Écart semaine</span><span style={{textAlign:"right",color:data.report.ecart>=0?"#059669":"#DC2626"}}>{data.report.ecart>=0?"+":""}{m2h(Math.abs(data.report.ecart))}</span>
-          <span style={{color:pk.sub}}>Compteur précédent</span><span style={{textAlign:"right"}}>{data.report.avant>=0?"+":""}{m2h(Math.abs(data.report.avant))}</span>
-          <span style={{color:pk.sub}}>Report appliqué</span><span style={{textAlign:"right",fontWeight:600}}>{data.report.applique>=0?"+":""}{m2h(Math.abs(data.report.applique))}</span>
-          <span style={{color:pk.sub,fontWeight:700}}>Compteur actuel</span><span style={{textAlign:"right",fontWeight:700,color:"#1E40AF"}}>{data.report.apres>=0?"+":""}{m2h(Math.abs(data.report.apres))}</span>
+          <span style={{color:pk.sub}}>Écart semaine</span><span style={{textAlign:"right",color:data.report.ecart>=0?"#059669":"#DC2626"}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
+          <span style={{color:pk.sub}}>Compteur précédent</span><span style={{textAlign:"right"}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span>
+          <span style={{color:pk.sub}}>Report appliqué</span><span style={{textAlign:"right",fontWeight:600}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span>
+          <span style={{color:pk.sub,fontWeight:700}}>Compteur actuel</span><span style={{textAlign:"right",fontWeight:700,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span>
         </div>
       </div>}
       {data.valideA&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
@@ -363,6 +370,29 @@ window.MonReleve=function MonReleve(){
       <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
       {ok&&<button onClick={()=>setEd(false)} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
       {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
+      {/* Guide d'utilisation */}
+      <div style={{width:"100%",marginTop:16,...GL,borderRadius:20,padding:"14px 18px"}}>
+        <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+          <span style={{fontSize:13,fontWeight:600,color:P.text}}>Guide d'utilisation</span>
+          <span style={{color:P.sub,fontSize:14,transform:guideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+        </button>
+        {guideOpen&&<div style={{marginTop:14,fontSize:12,color:P.sub,lineHeight:1.7}}>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>1. Saisie quotidienne</div>
+          <div style={{marginBottom:10}}>Remplir ses heures chaque jour de travail. Les pauses sont déduites automatiquement selon les paramètres définis.</div>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>2. Absences</div>
+          <div style={{marginBottom:10}}>Déclarer chaque jour d'absence avec le motif correspondant. Un jour déclaré absent n'est pas comptabilisé dans le total horaire.</div>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Validation et valeur légale</div>
+          <div style={{marginBottom:10}}>Valider la semaine une seule fois, quand les 5 jours sont complets et vérifiés. La validation fige le relevé et calcule le compteur de report. <strong style={{color:P.orange}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification effectuée après validation et envoi ne pourra être prise en compte.</strong></div>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Correction exceptionnelle</div>
+          <div style={{marginBottom:10}}>En cas d'erreur constatée avant envoi, un relevé validé peut être déverrouillé pour correction. Le déverrouillage annule le report de cette semaine dans le compteur. La correction doit être suivie d'une nouvelle validation et d'un nouvel envoi.</div>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Compteur de report</div>
+          <div style={{marginBottom:10}}>L'écart entre les heures réalisées et le contrat est reporté automatiquement, dans la limite de ±3h par semaine et ±6h au total. Le compteur est visible dans le tableau de bord et sur chaque relevé PDF.</div>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Export PDF</div>
+          <div style={{marginBottom:10}}>Après validation, exporter le relevé en PDF et l'envoyer par mail ou AirDrop. Le PDF fait foi.</div>
+          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>7. Sauvegardes</div>
+          <div>Effectuer une sauvegarde au minimum une fois par mois depuis le tableau de bord. Conserver le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurer la sauvegarde depuis l'écran d'accueil.</div>
+        </div>}
+      </div>
       <button onClick={()=>setShowChangelog(true)} style={{background:"none",border:"none",cursor:"pointer",padding:8,marginTop:8}}>
         <span style={{fontSize:10,color:P.dim}}>v{VERSION}</span>
         <span style={{fontSize:9,color:P.muted,marginLeft:6}}>Nouveautés ›</span>
@@ -478,27 +508,39 @@ window.MonReleve=function MonReleve(){
       <div style={st.body}>
         {/* ── TAB HEURES ── */}
         {tab==="heures"&&(<>
+          {wd.valide&&<div style={{...GL,borderRadius:16,padding:"12px 16px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><div style={{fontSize:12,fontWeight:600,color:P.teal}}>✓ Semaine validée</div><div style={{fontSize:10,color:P.sub,marginTop:2}}>Relevé figé — modification impossible</div></div>
+            <button onClick={deverrouiller} style={{...st.sec,fontSize:11,padding:"8px 14px"}}>Modifier</button>
+          </div>}
           {dayOrder.map(i=>{
             const j=wd.jours[i];
-            if(j.absence)return<div key={i} style={st.dc}><div style={st.dRow}><span style={st.dN}>{JOURS[i]}</span><span style={st.absP}>{j.motif==="Autre"?(j.motifAutre||"Absence"):j.motif}</span></div></div>;
+            if(j.absence)return<div key={i} style={{...st.dc,...(wd.valide?{opacity:.7}:{})}}><div style={st.dRow}><span style={st.dN}>{JOURS[i]}</span><span style={st.absP}>{j.motif==="Autre"?(j.motifAutre||"Absence"):j.motif}</span></div></div>;
             const n=cNet(j.arrivee,j.depart,pr);const isT=cur&&i===ti&&!isWeekend;const ok2=j.arrivee&&j.depart;
-            return(<div key={i} style={{...st.dc,...(isT?{border:`1.5px solid ${P.teal}`,boxShadow:`0 0 16px ${P.teal}15`}:{})}}>
+            return(<div key={i} style={{...st.dc,...(isT&&!wd.valide?{border:`1.5px solid ${P.teal}`,boxShadow:`0 0 16px ${P.teal}15`}:{}),...(wd.valide?{opacity:.7}:{})}}>
               <div style={st.dRow}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span style={st.dN}>{JOURS[i]}</span>
-                  {isT&&<span style={{fontSize:8,fontWeight:700,color:P.teal,background:P.tealDim,padding:"2px 7px",borderRadius:8}}>Aujourd'hui</span>}
+                  {isT&&!wd.valide&&<span style={{fontSize:8,fontWeight:700,color:P.teal,background:P.tealDim,padding:"2px 7px",borderRadius:8}}>Aujourd'hui</span>}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  {isT&&showQ&&!j.arrivee&&<button onClick={()=>pointer(i,"arrivee")} style={st.punchBtn}>↓</button>}
-                  {isT&&showQ&&j.arrivee&&!j.depart&&<button onClick={()=>pointer(i,"depart")} style={{...st.punchBtn,borderColor:`${P.blue}40`}}>↑</button>}
+                  {isT&&showQ&&!wd.valide&&!j.arrivee&&<button onClick={()=>pointer(i,"arrivee")} style={st.punchBtn}>↓</button>}
+                  {isT&&showQ&&!wd.valide&&j.arrivee&&!j.depart&&<button onClick={()=>pointer(i,"depart")} style={{...st.punchBtn,borderColor:`${P.blue}40`}}>↑</button>}
                   {ok2&&<span style={st.netP}>{m2h(n)}</span>}
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"start",marginTop:6}}>
-                <TimeInput value={j.arrivee} onChange={v=>mj(i,"arrivee",v)} label="Arrivée"/>
-                <div style={{color:P.dim,marginTop:22,fontSize:12}}>→</div>
-                <TimeInput value={j.depart} onChange={v=>mj(i,"depart",v)} label="Départ"/>
-              </div>
+              {wd.valide?
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"center",marginTop:6}}>
+                  <div style={{textAlign:"center",padding:"10px 12px",fontSize:15,fontWeight:600,color:P.sub}}>{j.arrivee||"–:–"}</div>
+                  <div style={{color:P.dim,fontSize:12}}>→</div>
+                  <div style={{textAlign:"center",padding:"10px 12px",fontSize:15,fontWeight:600,color:P.sub}}>{j.depart||"–:–"}</div>
+                </div>
+              :
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"start",marginTop:6}}>
+                  <TimeInput value={j.arrivee} onChange={v=>mj(i,"arrivee",v)} label="Arrivée"/>
+                  <div style={{color:P.dim,marginTop:22,fontSize:12}}>→</div>
+                  <TimeInput value={j.depart} onChange={v=>mj(i,"depart",v)} label="Départ"/>
+                </div>
+              }
               {ok2&&<div style={{fontSize:11,color:P.sub,marginTop:4}}>Pause {m2h(cPause(j.arrivee,j.depart,pr))} · Net {m2h(n)}</div>}
             </div>);
           })}
@@ -537,7 +579,7 @@ window.MonReleve=function MonReleve(){
             <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div><div style={{fontSize:11,color:P.sub,textTransform:"uppercase",letterSpacing:.5}}>Compteur de report</div></div>
-                <div style={{fontSize:22,fontWeight:800,color:cnt>0?P.teal:P.orange}}>{cnt>=0?"+":""}{m2h(Math.abs(cnt))}</div>
+                <div style={{fontSize:22,fontWeight:800,color:cnt>0?P.teal:P.orange}}>{cnt>0?"+":cnt<0?"−":""}{m2h(Math.abs(cnt))}</div>
               </div>
               <div style={{marginTop:6,height:4,borderRadius:2,background:P.card,overflow:"hidden",position:"relative"}}>
                 <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:1,background:P.dim}}/>
@@ -600,12 +642,12 @@ window.MonReleve=function MonReleve(){
         </>)}
       </div>
 
-      {tab==="heures"&&hasD&&<div style={st.fCTA}><button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button></div>}
+      {tab==="heures"&&hasD&&!wd.valide&&<div style={st.fCTA}><button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button></div>}
 
       {/* Tab bar with active green bg */}
       <div style={st.tabBar}>
         <div style={st.tabIn}>
-          {[{id:"heures",l:"Heures"},{id:"absences",l:"Absences"},{id:"historique",l:"Historique"}].map(t=>(
+          {[{id:"heures",l:"Heures"},{id:"absences",l:"Absences"},{id:"historique",l:"Tableau de bord"}].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{...st.tabB,...(tab===t.id?st.tabA:{})}}>
               {t.id==="heures"&&<IClock color={tab===t.id?P.teal:P.muted} size={20}/>}
               {t.id==="absences"&&<ICalX color={tab===t.id?P.teal:P.muted} size={20}/>}
