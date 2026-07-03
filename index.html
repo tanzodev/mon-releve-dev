@@ -227,6 +227,8 @@ window.MonReleve=function MonReleve(){
   const isWeekend=ti<0&&cur;
 
   useEffect(()=>{if(ok&&pr.nom)setWd(ldSem(ck,pr.nom)||vide(sem));},[ck,pr.nom,ok,rk,sem.n,sem.y]);
+  // Recalcule le compteur au chargement (migration valorisation absences)
+  useEffect(()=>{if(ok&&pr.nom)recalcCounter(pr.nom);},[ok,pr.nom]);
 
   const sv=useCallback(d=>{setWd(d);svSem(ck,pr.nom,d);},[ck,pr.nom]);
   const toastRef=useRef(null);
@@ -257,8 +259,10 @@ window.MonReleve=function MonReleve(){
   const setNotes=v=>{if(!wd)return;sv({...wd,notes:v});};
 
   const totMin=wd?wd.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0):0;
+  const absMin=wd?absValSem(wd.jours,pr.contrat):0;
+  const totCompta=totMin+absMin;
   const hasD=wd&&wd.jours.some(j=>j.arrivee||j.depart||j.absence);
-  const pct=Math.min(100,Math.round(totMin/objM*100));
+  const pct=Math.min(100,Math.round(totCompta/objM*100));
   const prenom=(pr.nom||"").split(" ")[0]||pr.nom;
   const showQ=pr.pointageRapide!==false;
 
