@@ -233,9 +233,8 @@ window.MonReleve=function MonReleve(){
   };
   const deverrouiller=()=>{
     if(!wd||!wd.valide)return;
-    // Annuler le report de cette semaine dans le compteur
-    if(wd.report){const cnt=ldCounter();svCounter(cnt-wd.report.applique);}
     sv({...wd,valide:false,valideA:null,report:null});
+    recalcCounter(pr.nom);
     flash("Relevé déverrouillé");
   };
   const setNotes=v=>{if(!wd)return;sv({...wd,notes:v});};
@@ -410,7 +409,7 @@ window.MonReleve=function MonReleve(){
         {!cfDel?<button onClick={()=>setCfDel(true)} style={{...st.sec,width:"100%",color:P.red}}>Supprimer ce relevé</button>
           :<div style={{background:"rgba(239,68,68,.1)",borderRadius:18,padding:16}}>
             <div style={{fontSize:13,fontWeight:600,color:P.text,textAlign:"center",marginBottom:12}}>Supprimer la semaine {parseInt(arch.cle.split("-S")[1])} ?</div>
-            <div style={{display:"flex",gap:10}}><button onClick={()=>setCfDel(false)} style={{...st.sec,flex:1}}>Annuler</button><button onClick={()=>{if(arch.data&&arch.data.report){const cnt=ldCounter();svCounter(cnt-arch.data.report.applique);}delSem(arch.cle,pr.nom);setArch(null);setCfDel(false);setRk(x=>x+1);flash("Supprimé");}} style={{...st.sec,flex:1,background:P.red,color:"#fff"}}>Supprimer</button></div>
+            <div style={{display:"flex",gap:10}}><button onClick={()=>setCfDel(false)} style={{...st.sec,flex:1}}>Annuler</button><button onClick={()=>{delSem(arch.cle,pr.nom);recalcCounter(pr.nom);setArch(null);setCfDel(false);setRk(x=>x+1);flash("Supprimé");}} style={{...st.sec,flex:1,background:P.red,color:"#fff"}}>Supprimer</button></div>
           </div>}
       </div>
     </div>
