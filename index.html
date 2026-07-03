@@ -189,6 +189,7 @@ window.MonReleve=function MonReleve(){
   const[pop,setPop]=useState(false);
   const[arch,setArch]=useState(null);
   const[cfDel,setCfDel]=useState(false);
+  const[cfUnlock,setCfUnlock]=useState(false);
   const[rk,setRk]=useState(0);
   const[peOpen,setPeOpen]=useState(false);
   const[notesOpen,setNotesOpen]=useState(false);
@@ -370,30 +371,7 @@ window.MonReleve=function MonReleve(){
       <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
       {ok&&<button onClick={()=>setEd(false)} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
       {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
-      {/* Guide d'utilisation */}
-      <div style={{width:"100%",marginTop:16,...GL,borderRadius:20,padding:"14px 18px"}}>
-        <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
-          <span style={{fontSize:13,fontWeight:600,color:P.text}}>Guide d'utilisation</span>
-          <span style={{color:P.sub,fontSize:14,transform:guideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
-        </button>
-        {guideOpen&&<div style={{marginTop:14,fontSize:12,color:P.sub,lineHeight:1.7}}>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>1. Saisie quotidienne</div>
-          <div style={{marginBottom:10}}>Remplir ses heures chaque jour de travail. Les pauses sont déduites automatiquement selon les paramètres définis.</div>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>2. Absences</div>
-          <div style={{marginBottom:10}}>Déclarer chaque jour d'absence avec le motif correspondant. Un jour déclaré absent n'est pas comptabilisé dans le total horaire.</div>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Validation et valeur légale</div>
-          <div style={{marginBottom:10}}>Valider la semaine une seule fois, quand les 5 jours sont complets et vérifiés. La validation fige le relevé et calcule le compteur de report. <strong style={{color:P.orange}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification effectuée après validation et envoi ne pourra être prise en compte.</strong></div>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Correction exceptionnelle</div>
-          <div style={{marginBottom:10}}>En cas d'erreur constatée avant envoi, un relevé validé peut être déverrouillé pour correction. Le déverrouillage annule le report de cette semaine dans le compteur. La correction doit être suivie d'une nouvelle validation et d'un nouvel envoi.</div>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Compteur de report</div>
-          <div style={{marginBottom:10}}>L'écart entre les heures réalisées et le contrat est reporté automatiquement, dans la limite de ±3h par semaine et ±6h au total. Le compteur est visible dans le tableau de bord et sur chaque relevé PDF.</div>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Export PDF</div>
-          <div style={{marginBottom:10}}>Après validation, exporter le relevé en PDF et l'envoyer par mail ou AirDrop. Le PDF fait foi.</div>
-          <div style={{fontWeight:700,color:P.text,marginBottom:4}}>7. Sauvegardes</div>
-          <div>Effectuer une sauvegarde au minimum une fois par mois depuis le tableau de bord. Conserver le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurer la sauvegarde depuis l'écran d'accueil.</div>
-        </div>}
-      </div>
-      <button onClick={()=>setShowChangelog(true)} style={{background:"none",border:"none",cursor:"pointer",padding:8,marginTop:8}}>
+      <button onClick={()=>setShowChangelog(true)} style={{background:"none",border:"none",cursor:"pointer",padding:8,marginTop:12}}>
         <span style={{fontSize:10,color:P.dim}}>v{VERSION}</span>
         <span style={{fontSize:9,color:P.muted,marginLeft:6}}>Nouveautés ›</span>
       </button>
@@ -508,9 +486,22 @@ window.MonReleve=function MonReleve(){
       <div style={st.body}>
         {/* ── TAB HEURES ── */}
         {tab==="heures"&&(<>
-          {wd.valide&&<div style={{...GL,borderRadius:16,padding:"12px 16px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div><div style={{fontSize:12,fontWeight:600,color:P.teal}}>✓ Semaine validée</div><div style={{fontSize:10,color:P.sub,marginTop:2}}>Relevé figé — modification impossible</div></div>
-            <button onClick={deverrouiller} style={{...st.sec,fontSize:11,padding:"8px 14px"}}>Modifier</button>
+          {wd.valide&&<div style={{...GL,borderRadius:16,padding:"12px 16px",marginBottom:10}}>
+            {!cfUnlock?
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:12,fontWeight:600,color:P.teal}}>✓ Semaine validée</div><div style={{fontSize:10,color:P.sub,marginTop:2}}>Relevé figé — modification impossible</div></div>
+                <button onClick={()=>setCfUnlock(true)} style={{...st.sec,fontSize:11,padding:"8px 14px"}}>Modifier</button>
+              </div>
+            :
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:P.orange,textAlign:"center",marginBottom:8}}>Déverrouiller ce relevé ?</div>
+                <div style={{fontSize:11,color:P.sub,textAlign:"center",marginBottom:12}}>Le report de cette semaine sera annulé du compteur. Une nouvelle validation sera nécessaire.</div>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>setCfUnlock(false)} style={{...st.sec,flex:1}}>Annuler</button>
+                  <button onClick={()=>{deverrouiller();setCfUnlock(false);}} style={{...st.sec,flex:1,background:P.orange,color:P.bg}}>Déverrouiller</button>
+                </div>
+              </div>
+            }
           </div>}
           {dayOrder.map(i=>{
             const j=wd.jours[i];
@@ -620,6 +611,34 @@ window.MonReleve=function MonReleve(){
               <div style={{display:"flex",alignItems:"center",gap:6}}>{d.valide&&<ICheck size={12}/>}<span style={{fontSize:10,fontWeight:600,color:P.teal,letterSpacing:.5}}>S{parseInt(c.split("-S")[1])}</span><span style={{color:P.dim,fontSize:18}}>›</span></div>
             </button>);
           })}
+          {/* Guide d'utilisation */}
+          <div style={{marginTop:12}}>
+            <div style={{...GL,borderRadius:24,padding:"14px 18px"}}>
+              <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:16}}>📋</span>
+                  <span style={{fontSize:14,fontWeight:700,color:P.text}}>Guide d'utilisation</span>
+                </div>
+                <span style={{color:P.sub,fontSize:14,transform:guideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+              </button>
+              {guideOpen&&<div style={{marginTop:14,fontSize:12,color:P.sub,lineHeight:1.7}}>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>1. Saisie quotidienne</div>
+                <div style={{marginBottom:10}}>Remplir ses heures chaque jour de travail. Les pauses sont déduites automatiquement selon les paramètres définis.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>2. Absences</div>
+                <div style={{marginBottom:10}}>Déclarer chaque jour d'absence avec le motif correspondant. Un jour déclaré absent n'est pas comptabilisé dans le total horaire.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Validation et valeur légale</div>
+                <div style={{marginBottom:10}}>Valider la semaine une seule fois, quand les 5 jours sont complets et vérifiés. La validation fige le relevé et calcule le compteur de report. <strong style={{color:P.orange}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification effectuée après validation et envoi ne pourra être prise en compte.</strong></div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Correction exceptionnelle</div>
+                <div style={{marginBottom:10}}>En cas d'erreur constatée avant envoi, un relevé validé peut être déverrouillé pour correction. Le déverrouillage annule le report de cette semaine dans le compteur. La correction doit être suivie d'une nouvelle validation et d'un nouvel envoi.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Compteur de report</div>
+                <div style={{marginBottom:10}}>L'écart entre les heures réalisées et le contrat est reporté automatiquement, dans la limite de ±3h par semaine et ±6h au total. Le compteur est visible dans le tableau de bord et sur chaque relevé PDF.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Export PDF</div>
+                <div style={{marginBottom:10}}>Après validation, exporter le relevé en PDF et l'envoyer par mail ou AirDrop. Le PDF fait foi.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>7. Sauvegardes</div>
+                <div>Effectuer une sauvegarde au minimum une fois par mois depuis le tableau de bord. Conserver le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurer la sauvegarde depuis l'écran d'accueil.</div>
+              </div>}
+            </div>
+          </div>
           {/* Sécurité des données */}
           <div style={{marginTop:20}}>
             <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
