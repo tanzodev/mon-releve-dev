@@ -54,6 +54,9 @@ const CHANGELOG = [
 ];
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
+const MOTIFS_VALORISES = ["Congé payé","RTT","Férié","Maladie","Formation"];
+function absValJour(contrat){const h=H_OBJ[contrat]||DEF_OBJ;return h>=39?480:420;} // 8h ou 7h selon contrat
+function absValSem(jours,contrat){return jours.reduce((s,j)=>{if(!j.absence)return s;if(!MOTIFS_VALORISES.includes(j.motif))return s;return s+absValJour(contrat);},0);}
 
 // ── Constants ──
 const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
@@ -111,18 +114,19 @@ function delSem(c,n){try{localStorage.removeItem(`${PX}${n}_${c}`);}catch{}}
 function ldCounter(){try{const v=localStorage.getItem(`${PX}report_counter`);return v?parseInt(v):0;}catch{return 0;}}
 function svCounter(v){try{localStorage.setItem(`${PX}report_counter`,String(v));}catch{}}
 function recalcCounter(n){
-  // Recalcule le compteur ET corrige les reports stockés depuis les heures réelles
+  // Recalcule le compteur avec valorisation des absences (règles CYFAC)
   const cfg=ldProf();
   const objM=(H_OBJ[cfg.contrat]||DEF_OBJ)*60;
   const weeks=allSem(n).filter(w=>w.data&&w.data.valide).sort((a,b)=>a.cle.localeCompare(b.cle));
   let cnt=0;
   weeks.forEach(w=>{
-    const tot=w.data.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,cfg),0);
-    const ecart=tot-objM;
+    const travaille=w.data.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,cfg),0);
+    const valorise=absValSem(w.data.jours,cfg.contrat);
+    const ecart=(travaille+valorise)-objM;
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+reportable));
     const applique=apres-cnt;
-    w.data.report={avant:cnt,ecart,applique,apres};
+    w.data.report={avant:cnt,ecart,applique,apres,travaille,valorise};
     svSem(w.cle,n,w.data);
     cnt=apres;
   });
@@ -233,11 +237,13 @@ window.MonReleve=function MonReleve(){
   const valider=()=>{
     if(!wd)return;
     const avant=ldCounter();
-    const ecart=totMin-objM;
+    const absMin=absValSem(wd.jours,pr.contrat);
+    const totalComptabilise=totMin+absMin;
+    const ecart=totalComptabilise-objM;
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,avant+reportable));
     const applique=apres-avant;
-    const report={avant,ecart,applique,apres};
+    const report={avant,ecart,applique,apres,travaille:totMin,valorise:absMin};
     svCounter(apres);
     sv({...wd,valide:true,valideA:new Date().toISOString(),report});
     setPop(true);flash("Semaine validée ✓");
@@ -329,7 +335,9 @@ window.MonReleve=function MonReleve(){
         <div style={{fontWeight:700,marginBottom:6,color:"#1E40AF"}}>Compteur de report</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
           <span style={{color:pk.sub}}>Objectif hebdo</span><span style={{textAlign:"right"}}>{m2h((H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
-          <span style={{color:pk.sub}}>Heures réalisées</span><span style={{textAlign:"right"}}>{m2h(cu)}</span>
+          <span style={{color:pk.sub}}>Heures travaillées</span><span style={{textAlign:"right"}}>{m2h(data.report.travaille||cu)}</span>
+          {data.report.valorise>0&&<><span style={{color:pk.sub}}>Absences valorisées</span><span style={{textAlign:"right",color:"#059669"}}>+{m2h(data.report.valorise)}</span></>}
+          {data.report.valorise>0&&<><span style={{color:pk.sub,fontWeight:600}}>Total comptabilisé</span><span style={{textAlign:"right",fontWeight:600}}>{m2h((data.report.travaille||cu)+data.report.valorise)}</span></>}
           <span style={{color:pk.sub}}>Écart semaine</span><span style={{textAlign:"right",color:data.report.ecart>=0?"#059669":"#DC2626"}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
           <span style={{color:pk.sub}}>Compteur précédent</span><span style={{textAlign:"right"}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span>
           <span style={{color:pk.sub}}>Report appliqué</span><span style={{textAlign:"right",fontWeight:600}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span>
