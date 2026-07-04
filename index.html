@@ -54,9 +54,16 @@ const CHANGELOG = [
 ];
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
-const MOTIFS_VALORISES = ["Congé payé","RTT","Férié","Maladie","Formation"];
-function absValJour(contrat){const h=H_OBJ[contrat]||DEF_OBJ;return h>=39?480:420;} // 8h ou 7h selon contrat
-function absValSem(jours,contrat){return jours.reduce((s,j)=>{if(!j.absence)return s;if(!MOTIFS_VALORISES.includes(j.motif))return s;return s+absValJour(contrat);},0);}
+const MOTIFS_VALORISES = ["Congé payé","Férié"];
+const MOTIFS_NEUTRES = ["Maladie","Formation","RTT","Sans solde","Autre"];
+function absValJour(contrat){const h=H_OBJ[contrat]||DEF_OBJ;return h>=39?480:420;}
+function calcReport(jours,contrat,cfg){
+  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=absValJour(contrat);
+  let travaille=0,valorise=0,neutre=0;
+  jours.forEach(j=>{if(!j.absence){travaille+=cNet(j.arrivee,j.depart,cfg);}else if(MOTIFS_VALORISES.includes(j.motif)){valorise+=dv;}else if(MOTIFS_NEUTRES.includes(j.motif)){neutre+=dv;}});
+  const objAjuste=objM-neutre;const total=travaille+valorise;const ecart=total-objAjuste;
+  return{travaille,valorise,neutre,objAjuste,total,ecart};
+}
 
 // ── Constants ──
 const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
@@ -114,19 +121,15 @@ function delSem(c,n){try{localStorage.removeItem(`${PX}${n}_${c}`);}catch{}}
 function ldCounter(){try{const v=localStorage.getItem(`${PX}report_counter`);return v?parseInt(v):0;}catch{return 0;}}
 function svCounter(v){try{localStorage.setItem(`${PX}report_counter`,String(v));}catch{}}
 function recalcCounter(n){
-  // Recalcule le compteur avec valorisation des absences (règles CYFAC)
   const cfg=ldProf();
-  const objM=(H_OBJ[cfg.contrat]||DEF_OBJ)*60;
   const weeks=allSem(n).filter(w=>w.data&&w.data.valide).sort((a,b)=>a.cle.localeCompare(b.cle));
   let cnt=0;
   weeks.forEach(w=>{
-    const travaille=w.data.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,cfg),0);
-    const valorise=absValSem(w.data.jours,cfg.contrat);
-    const ecart=(travaille+valorise)-objM;
-    const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
+    const rpt=calcReport(w.data.jours,cfg.contrat,cfg);
+    const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+reportable));
     const applique=apres-cnt;
-    w.data.report={avant:cnt,ecart,applique,apres,travaille,valorise};
+    w.data.report={avant:cnt,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:rpt.valorise,neutre:rpt.neutre,objAjuste:rpt.objAjuste};
     svSem(w.cle,n,w.data);
     cnt=apres;
   });
@@ -239,13 +242,11 @@ window.MonReleve=function MonReleve(){
   const valider=()=>{
     if(!wd)return;
     const avant=ldCounter();
-    const absMin=absValSem(wd.jours,pr.contrat);
-    const totalComptabilise=totMin+absMin;
-    const ecart=totalComptabilise-objM;
-    const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,ecart));
+    const rpt=calcReport(wd.jours,pr.contrat,pr);
+    const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,avant+reportable));
     const applique=apres-avant;
-    const report={avant,ecart,applique,apres,travaille:totMin,valorise:absMin};
+    const report={avant,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:rpt.valorise,neutre:rpt.neutre,objAjuste:rpt.objAjuste};
     svCounter(apres);
     sv({...wd,valide:true,valideA:new Date().toISOString(),report});
     setPop(true);flash("Semaine validée ✓");
@@ -259,10 +260,9 @@ window.MonReleve=function MonReleve(){
   const setNotes=v=>{if(!wd)return;sv({...wd,notes:v});};
 
   const totMin=wd?wd.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0):0;
-  const absMin=wd?absValSem(wd.jours,pr.contrat):0;
-  const totCompta=totMin+absMin;
+  const curReport=wd?calcReport(wd.jours,pr.contrat,pr):null;
   const hasD=wd&&wd.jours.some(j=>j.arrivee||j.depart||j.absence);
-  const pct=Math.min(100,Math.round(totCompta/objM*100));
+  const pct=curReport?Math.min(100,Math.round(curReport.total/curReport.objAjuste*100)):0;
   const prenom=(pr.nom||"").split(" ")[0]||pr.nom;
   const showQ=pr.pointageRapide!==false;
 
@@ -335,17 +335,30 @@ window.MonReleve=function MonReleve(){
       </table>
       {data.notes&&<div style={{fontSize:10,color:pk.text,marginTop:10,padding:"8px 10px",background:"#F9FAFB",borderRadius:8,border:`1px solid ${pk.border}`}}><strong>Note :</strong> {data.notes}</div>}
       <div style={{fontSize:9,color:pk.muted,marginTop:8}}>Pauses : {pr.pauseMatinHeure||D_PM_H}–{pr.pauseMatinFin||D_PM_F} + {pr.pauseMidiDebut||D_PD_D}–{pr.pauseMidiFin||D_PD_F}</div>
-      {data.report&&<div style={{marginTop:12,padding:"10px 12px",background:"#F0F9FF",borderRadius:8,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
-        <div style={{fontWeight:700,marginBottom:6,color:"#1E40AF"}}>Compteur de report</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-          <span style={{color:pk.sub}}>Objectif hebdo</span><span style={{textAlign:"right"}}>{m2h((H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
-          <span style={{color:pk.sub}}>Heures travaillées</span><span style={{textAlign:"right"}}>{m2h(data.report.travaille||cu)}</span>
-          {data.report.valorise>0&&<><span style={{color:pk.sub}}>Absences valorisées</span><span style={{textAlign:"right",color:"#059669"}}>+{m2h(data.report.valorise)}</span></>}
-          {data.report.valorise>0&&<><span style={{color:pk.sub,fontWeight:600}}>Total comptabilisé</span><span style={{textAlign:"right",fontWeight:600}}>{m2h((data.report.travaille||cu)+data.report.valorise)}</span></>}
-          <span style={{color:pk.sub}}>Écart semaine</span><span style={{textAlign:"right",color:data.report.ecart>=0?"#059669":"#DC2626"}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
-          <span style={{color:pk.sub}}>Compteur précédent</span><span style={{textAlign:"right"}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span>
-          <span style={{color:pk.sub}}>Report appliqué</span><span style={{textAlign:"right",fontWeight:600}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span>
-          <span style={{color:pk.sub,fontWeight:700}}>Compteur actuel</span><span style={{textAlign:"right",fontWeight:700,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span>
+      {data.report&&<div style={{marginTop:12,padding:"12px 14px",background:"#F0F9FF",borderRadius:10,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
+        <div style={{fontWeight:700,marginBottom:8,color:"#1E40AF",fontSize:11}}>Compteur de report</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{fontSize:10,color:pk.sub}}>Heures travaillées</span><span style={{fontSize:12}}>{m2h(data.report.travaille||cu)}</span>
+        </div>
+        {data.report.valorise>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{fontSize:10,color:"#059669"}}>Absences valorisées (CP/Férié)</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(data.report.valorise)}</span>
+        </div>}
+        {data.report.neutre>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{fontSize:10,color:pk.sub}}>Absences neutres (objectif ajusté)</span><span style={{fontSize:10,color:pk.muted}}>−{m2h(data.report.neutre)}</span>
+        </div>}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px"}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorise||0))}</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",marginTop:6}}>
+          <span style={{fontSize:10,color:pk.sub}}>Objectif{data.report.neutre>0?" ajusté":""}</span><span>{m2h(data.report.objAjuste||(H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}>
+          <span style={{fontSize:10,color:pk.sub}}>Écart semaine</span><span style={{color:data.report.ecart>=0?"#059669":"#DC2626",fontWeight:600}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
+        </div>
+        <div style={{borderTop:`1px solid #DBEAFE`,marginTop:4,paddingTop:6}}>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:10,color:pk.sub}}>Compteur précédent</span><span>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:10,color:pk.sub}}>Report appliqué</span><span style={{fontWeight:600}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderTop:`1px solid #DBEAFE`,marginTop:4}}><span style={{fontSize:11,fontWeight:700}}>Compteur actuel</span><span style={{fontSize:13,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
         </div>
       </div>}
       {data.valideA&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
@@ -401,10 +414,7 @@ window.MonReleve=function MonReleve(){
       <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
       {ok&&<button onClick={()=>setEd(false)} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
       {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
-      <button onClick={()=>setShowChangelog(true)} style={{background:"none",border:"none",cursor:"pointer",padding:8,marginTop:12}}>
-        <span style={{fontSize:10,color:P.dim}}>v{VERSION}</span>
-        <span style={{fontSize:9,color:P.muted,marginLeft:6}}>Nouveautés ›</span>
-      </button>
+      <div style={{fontSize:10,color:P.dim,marginTop:12,textAlign:"center"}}>v{VERSION}</div>
     </div></div>);
   }
 
@@ -646,26 +656,35 @@ window.MonReleve=function MonReleve(){
             <div style={{...GL,borderRadius:24,padding:"14px 18px"}}>
               <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{fontSize:16}}>📋</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                   <span style={{fontSize:14,fontWeight:700,color:P.text}}>Guide d'utilisation</span>
                 </div>
                 <span style={{color:P.sub,fontSize:14,transform:guideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
               </button>
               {guideOpen&&<div style={{marginTop:14,fontSize:12,color:P.sub,lineHeight:1.7}}>
+                <div style={{fontWeight:700,color:P.teal,fontSize:13,marginBottom:8}}>Nouveautés v2.0</div>
+                <div style={{marginBottom:10,fontSize:11}}>Compteur de report automatique · Valorisation des congés et fériés · Verrouillage des relevés · Export PDF simplifié</div>
+                <div style={{height:1,background:P.border,margin:"10px 0"}}/>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>1. Saisie quotidienne</div>
-                <div style={{marginBottom:10}}>Remplir ses heures chaque jour de travail. Les pauses sont déduites automatiquement selon les paramètres définis.</div>
+                <div style={{marginBottom:10}}>Remplir ses heures chaque jour. Les pauses sont déduites automatiquement. Taper les chiffres directement (ex: 830 → 08:30).</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>2. Absences</div>
-                <div style={{marginBottom:10}}>Déclarer chaque jour d'absence avec le motif correspondant. Un jour déclaré absent n'est pas comptabilisé dans le total horaire.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Validation et valeur légale</div>
-                <div style={{marginBottom:10}}>Valider la semaine une seule fois, quand les 5 jours sont complets et vérifiés. La validation fige le relevé et calcule le compteur de report. <strong style={{color:P.orange}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification effectuée après validation et envoi ne pourra être prise en compte.</strong></div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Correction exceptionnelle</div>
-                <div style={{marginBottom:10}}>En cas d'erreur constatée avant envoi, un relevé validé peut être déverrouillé pour correction. Le déverrouillage annule le report de cette semaine dans le compteur. La correction doit être suivie d'une nouvelle validation et d'un nouvel envoi.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Compteur de report</div>
-                <div style={{marginBottom:10}}>L'écart entre les heures réalisées et le contrat est reporté automatiquement, dans la limite de ±3h par semaine et ±6h au total. Le compteur est visible dans le tableau de bord et sur chaque relevé PDF.</div>
+                <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif correspondant.</div>
+                <div style={{marginBottom:4,fontWeight:600,color:P.teal}}>Absences valorisées (comptent dans le compteur) :</div>
+                <div style={{marginBottom:6}}>Congé payé et Jour férié → 8h (contrat 39h) ou 7h (contrat 35h)</div>
+                <div style={{marginBottom:4,fontWeight:600,color:P.muted}}>Absences neutres (aucun impact sur le compteur) :</div>
+                <div style={{marginBottom:10}}>Maladie, Formation, RTT, Sans solde, Autre → apparaissent sur le relevé mais n'affectent pas le compteur.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Compteur de report</div>
+                <div style={{marginBottom:6}}>L'écart entre le total comptabilisé (heures travaillées + absences valorisées) et l'objectif (ajusté des absences neutres) est reporté automatiquement.</div>
+                <div style={{marginBottom:6}}>Limites : ±3h maximum par semaine, ±6h maximum cumulé.</div>
+                <div style={{marginBottom:10}}>Le compteur est visible dans le tableau de bord et sur chaque relevé PDF.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Validation et valeur légale</div>
+                <div style={{marginBottom:10}}>Valider la semaine une seule fois, quand les 5 jours sont complets et vérifiés. <strong style={{color:P.orange}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification après validation et envoi ne pourra être prise en compte.</strong></div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Correction exceptionnelle</div>
+                <div style={{marginBottom:10}}>Un relevé validé peut être déverrouillé pour correction (le report est annulé). La correction doit être suivie d'une nouvelle validation et d'un nouvel envoi.</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Export PDF</div>
-                <div style={{marginBottom:10}}>Après validation, exporter le relevé en PDF et l'envoyer par mail ou AirDrop. Le PDF fait foi.</div>
+                <div style={{marginBottom:10}}>Après validation, exporter en PDF puis partager par mail ou AirDrop. Le PDF contient le détail des heures et le compteur de report.</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>7. Sauvegardes</div>
-                <div>Effectuer une sauvegarde au minimum une fois par mois depuis le tableau de bord. Conserver le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurer la sauvegarde depuis l'écran d'accueil.</div>
+                <div>Effectuer une sauvegarde au minimum une fois par mois depuis le tableau de bord. Conserver le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurer depuis l'écran d'accueil.</div>
               </div>}
             </div>
           </div>
