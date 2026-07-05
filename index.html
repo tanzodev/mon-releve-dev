@@ -310,25 +310,14 @@ window.MonReleve=function MonReleve(){
   const restaurer=()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";inp.style.cssText="position:fixed;top:-9999px;left:-9999px;opacity:0";document.body.appendChild(inp);inp.onchange=e=>{const f=e.target.files[0];if(!f){document.body.removeChild(inp);return;}const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||typeof d!=="object"||!d.profile||typeof d.profile!=="object"||!Array.isArray(d.weeks))throw new Error("!");const pn=d.profile.nom||d.profile.name;if(!pn||typeof pn!=="string"||!pn.trim())throw new Error("!");const p={nom:pn.trim(),contrat:d.profile.contrat||"",entreprise:(d.profile.entreprise||d.profile.co||"").trim(),pointageRapide:d.profile.pointageRapide!==undefined?d.profile.pointageRapide:true,pauseMatinHeure:d.profile.pauseMatinHeure||D_PM_H,pauseMatinFin:d.profile.pauseMatinFin||D_PM_F,pauseMidiDebut:d.profile.pauseMidiDebut||D_PD_D,pauseMidiFin:d.profile.pauseMidiFin||D_PD_F};svProf(p);let imported=0;d.weeks.forEach(w=>{if(!w||typeof w!=="object")return;const c=w.cle||w.key;if(!c||typeof c!=="string"||!w.data)return;svSem(c,p.nom,w.data);imported++;});setPr(p);setOk(true);setRk(x=>x+1);recalcCounter(p.nom);flash(`Restauré ✓ (${imported} sem.)`)}catch{flash("Fichier invalide");}document.body.removeChild(inp);};r.onerror=()=>{flash("Erreur de lecture");document.body.removeChild(inp);};r.readAsText(f);};setTimeout(()=>inp.click(),100);};
 
   const stats=useMemo(()=>ok?mStats(pr.nom,pr.contrat,sem.n,pr):[],[pr.nom,pr.contrat,ok,rk,ck,sem.n,pr.pauseMatinHeure,pr.pauseMatinFin,pr.pauseMidiDebut,pr.pauseMidiFin]);
-  const mTot=stats.reduce((s,w)=>s+w.tot,0),mObj=stats.length*objM,mDiff=mTot-mObj;
+  const mTot=stats.reduce((s,w)=>s+w.tot,0),mObj=stats.reduce((s,w)=>s+w.obj,0),mDiff=mTot-mObj;
+  const mDays=stats.reduce((s,w)=>s+(w.daysIn||5),0);
   const mPct=mObj>0?Math.min(100,Math.round(mTot/mObj*100)):0;
   const mAbsTotal=stats.reduce((s,w)=>s+w.absCount,0);
   const mAbsDetail=useMemo(()=>{const agg={};stats.forEach(w=>{Object.entries(w.absMotifs).forEach(([m,c])=>{agg[m]=(agg[m]||0)+c;});});return Object.entries(agg).sort((a,b)=>b[1]-a[1]);},[stats]);
   const archList=useMemo(()=>allSem(pr.nom),[pr.nom,rk,ck,tab,wd]);
 
   // ── Chart ──
-  const Chart=useMemo(()=>function ChartInner(){
-    if(!stats.length)return<div style={{color:P.muted,fontSize:13,textAlign:"center",padding:20}}>Aucune donnée</div>;
-    const mx=Math.max(...stats.map(s=>Math.max(s.tot,s.obj)));
-    return(<div><div style={{display:"flex",flexDirection:"column",gap:10}}>
-      {stats.map((w,i)=>{const pc=mx>0?Math.round(w.tot/mx*100):0;const op=mx>0?Math.round(w.obj/mx*100):0;const col=w.tot>w.obj?P.teal:(w.cur||!w.v)?P.blue:P.orange;
-        return(<div key={i}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:11,fontWeight:700,color:P.text}}>S{w.num}</span><span style={{fontSize:11,fontWeight:600,color:col}}>{m2h(w.tot)}<span style={{color:P.muted,fontWeight:400}}> / {m2h(w.obj)}</span></span></div>
-          <div style={{height:6,borderRadius:3,background:P.card,position:"relative",overflow:"hidden"}}><div style={{position:"absolute",left:`${op}%`,top:0,bottom:0,width:1.5,background:P.muted,opacity:.4,zIndex:2}}/><div style={{height:"100%",borderRadius:3,background:col,width:`${Math.min(100,pc)}%`,transition:"width .4s"}}/></div></div>);
-      })}</div>
-      <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:10,flexWrap:"wrap"}}>
-        {[["En cours",P.blue],["Heures sup.",P.teal],["Sous objectif",P.orange]].map(([l,c])=>(<div key={l} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:6,height:6,borderRadius:3,background:c}}/><span style={{fontSize:9,color:P.sub}}>{l}</span></div>))}
-      </div></div>);
-  },[stats,sem.n]);
 
   // ── PDF ──
   const Releve=({data,ck:ck2,l:l2,v:v2})=>{
@@ -643,7 +632,7 @@ window.MonReleve=function MonReleve(){
           <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
               <div><div style={{fontSize:10,color:P.sub,textTransform:"uppercase",letterSpacing:.5}}>Cumulé</div><div style={{fontSize:28,fontWeight:800,color:P.text,marginTop:2,letterSpacing:-1}}>{m2h(mTot)}</div></div>
-              <div style={{textAlign:"right",marginBottom:2}}><div style={{fontSize:13,color:P.muted}}>sur {m2h(mObj)}</div><div style={{fontSize:10,color:P.sub,marginTop:1}}>{stats.length} sem.</div></div>
+              <div style={{textAlign:"right",marginBottom:2}}><div style={{fontSize:13,color:P.muted}}>sur {m2h(mObj)}</div><div style={{fontSize:10,color:P.sub,marginTop:1}}>{mDays} jour{mDays>1?"s":""}</div></div>
             </div>
             <div style={{marginTop:10,height:6,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span style={{fontSize:10,color:P.muted}}>{mPct}%</span><span style={{fontSize:10,color:P.muted}}>{m2h(mObj)}</span></div>
@@ -656,7 +645,24 @@ window.MonReleve=function MonReleve(){
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(251,191,36,.06)",padding:"4px 10px",borderRadius:999,border:`1px solid rgba(251,191,36,.12)`}}><span style={{fontSize:11,fontWeight:600,color:P.orange}}>{count}</span><span style={{fontSize:11,color:P.sub}}>{motif}</span></div>))}</div>
             </div>)}
           </div>
-          {stats.length>0&&<div style={{...GL,borderRadius:24,padding:"14px 18px",marginTop:10}}><div style={{fontSize:12,fontWeight:600,color:P.text,marginBottom:10}}>Heures par semaine</div><Chart/></div>}
+          {stats.length>0&&<div style={{...GL,borderRadius:24,padding:"14px 18px",marginTop:10}}>
+            <div style={{fontSize:12,fontWeight:600,color:P.text,marginBottom:10}}>Détail par semaine</div>
+            {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
+              return(<div key={i} style={{marginBottom:i<stats.length-1?8:0}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:11,fontWeight:700,color:P.text}}>S{w.num}</span>
+                    {w.daysIn&&w.daysIn<5&&<span style={{fontSize:9,color:P.muted}}>({w.daysIn}j)</span>}
+                    {w.v&&<ICheck size={10}/>}
+                  </div>
+                  <span style={{fontSize:12,fontWeight:600,color:col}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(w.obj)}</span></span>
+                </div>
+                <div style={{height:4,borderRadius:2,background:P.card,overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:2,background:col,width:`${pc}%`,transition:"width .4s"}}/>
+                </div>
+              </div>);
+            })}
+          </div>}
           <div style={{marginTop:12,fontSize:14,fontWeight:700,color:P.text,marginBottom:8}}>Tous les relevés</div>
           {archList.length===0&&<div style={{color:P.muted,fontSize:13,padding:30,textAlign:"center"}}>Aucun relevé</div>}
           {archList.map(({cle:c,data:d})=>{
