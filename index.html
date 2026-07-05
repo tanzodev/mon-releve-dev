@@ -55,7 +55,7 @@ const CHANGELOG = [
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
-const MOTIFS_NEUTRES = ["Maladie","Formation","Sans solde","Autre"];
+const MOTIFS_NEUTRES = ["Maladie","Sans solde","Autre"];
 function absValJour(contrat){const h=H_OBJ[contrat]||DEF_OBJ;return h>=39?480:420;}
 function calcReport(jours,contrat,cfg){
   const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=absValJour(contrat);
@@ -69,7 +69,7 @@ function calcReport(jours,contrat,cfg){
 const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
 const D_PM_H = "10:00", D_PM_F = "10:15", D_PD_D = "12:30", D_PD_F = "13:15";
 const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
-const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Formation","Autre"];
+const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Autre"];
 const CONTRATS = ["CDI — 35h","CDI — 39h","CDI — Temps partiel","CDD","CDD — Temps partiel","Apprentissage","Intérim","Autre"];
 const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39,"CDI — Temps partiel":28,CDD:35,"CDD — Temps partiel":28,Apprentissage:35,Intérim:35,Autre:35};
 const MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -241,6 +241,9 @@ window.MonReleve=function MonReleve(){
   const[showNews,setShowNews]=useState(()=>{try{return localStorage.getItem(`${PX}last_ver`)!==VERSION;}catch{return false;}});
   const[showChangelog,setShowChangelog]=useState(false);
   const[guideOpen,setGuideOpen]=useState(false);
+  const[detailMois,setDetailMois]=useState(false);
+  const[relOpen,setRelOpen]=useState(false);
+  const[aideOpen,setAideOpen]=useState(false);
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
 
   const{s:sem,l:lun}=semOff(off);
@@ -611,127 +614,142 @@ window.MonReleve=function MonReleve(){
           </div>))}
         </>)}
 
-        {/* ── TAB HISTORIQUE ── */}
+        {/* ── TAB TABLEAU DE BORD ── */}
         {tab==="historique"&&(<>
-          {/* Compteur de report */}
-          {(()=>{const cnt=ldCounter();return cnt!==0?(
-            <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:12}}>
+          {/* Carte 2 — Compteur de report (toujours visible) */}
+          {(()=>{const cnt=ldCounter();return(
+            <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{fontSize:11,color:P.sub,textTransform:"uppercase",letterSpacing:.5}}>Compteur de report</div></div>
-                <div style={{fontSize:22,fontWeight:800,color:cnt>0?P.teal:P.orange}}>{cnt>0?"+":cnt<0?"−":""}{m2h(Math.abs(cnt))}</div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <span style={{fontSize:11,color:P.sub,textTransform:"uppercase",letterSpacing:.5,fontWeight:600}}>Compteur de report</span>
+                </div>
+                <div style={{fontSize:22,fontWeight:800,color:cnt>0?P.teal:cnt<0?P.orange:P.text}}>{cnt>0?"+":cnt<0?"−":""}{m2h(Math.abs(cnt))}</div>
               </div>
               <div style={{marginTop:6,height:4,borderRadius:2,background:P.card,overflow:"hidden",position:"relative"}}>
                 <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:1,background:P.dim}}/>
-                <div style={{height:"100%",borderRadius:2,background:cnt>0?P.teal:P.orange,width:`${Math.min(100,Math.abs(cnt)/REPORT_GLOBAL_CAP*50)}%`,marginLeft:cnt>=0?"50%":"auto",marginRight:cnt<0?"50%":"auto",transition:"width .4s"}}/>
+                {cnt!==0&&<div style={{height:"100%",borderRadius:2,background:cnt>0?P.teal:P.orange,width:`${Math.min(50,Math.abs(cnt)/REPORT_GLOBAL_CAP*50)}%`,marginLeft:cnt>=0?"50%":"auto",marginRight:cnt<0?"50%":"auto",transition:"width .4s"}}/>}
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>-{m2h(REPORT_GLOBAL_CAP)}</span><span style={{fontSize:9,color:P.dim}}>0</span><span style={{fontSize:9,color:P.muted}}>+{m2h(REPORT_GLOBAL_CAP)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>−{m2h(REPORT_GLOBAL_CAP)}</span><span style={{fontSize:9,color:P.dim}}>0</span><span style={{fontSize:9,color:P.muted}}>+{m2h(REPORT_GLOBAL_CAP)}</span></div>
+              <div style={{fontSize:9,color:P.dim,marginTop:4,textAlign:"center"}}>Plafond hebdo : ±{m2h(REPORT_WEEK_CAP)} · Plafond cumulé : ±{m2h(REPORT_GLOBAL_CAP)}</div>
             </div>
-          ):null;})()}
-          <div style={{fontSize:16,fontWeight:700,color:P.text,marginBottom:3}}>{MOIS[new Date().getMonth()]}</div>
-          <div style={{fontSize:12,color:P.sub,marginBottom:10}}>Synthèse mensuelle</div>
-          <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-              <div><div style={{fontSize:10,color:P.sub,textTransform:"uppercase",letterSpacing:.5}}>Cumulé</div><div style={{fontSize:28,fontWeight:800,color:P.text,marginTop:2,letterSpacing:-1}}>{m2h(mTot)}</div></div>
-              <div style={{textAlign:"right",marginBottom:2}}><div style={{fontSize:13,color:P.muted}}>sur {m2h(mObj)}</div><div style={{fontSize:10,color:P.sub,marginTop:1}}>{mDays} jour{mDays>1?"s":""}</div></div>
+          );})()}
+
+          {/* Carte 3 — Mois en cours (toujours visible) */}
+          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:11,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
+              </div>
+              {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600}}>Détail du mois {detailMois?"▴":"›"}</button>}
             </div>
-            <div style={{marginTop:10,height:6,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}><span style={{fontSize:10,color:P.muted}}>{mPct}%</span><span style={{fontSize:10,color:P.muted}}>{m2h(mObj)}</span></div>
-            {stats.length>0&&(<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:12,background:mDiff>0?P.tealDim:mDiff<0?"rgba(251,191,36,.08)":"rgba(59,130,246,.08)",marginTop:8}}>
-              <div style={{width:7,height:7,borderRadius:4,background:mDiff>0?P.teal:mDiff<0?P.orange:P.blue}}/>
-              <span style={{fontSize:12,fontWeight:600,color:mDiff>0?P.teal:mDiff<0?P.orange:P.blue}}>{mDiff>0?`+${m2h(mDiff)} heures sup.`:mDiff<0?`${m2h(Math.abs(mDiff))} restantes`:"Objectif atteint"}</span>
-            </div>)}
-            {mAbsTotal>0&&(<div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:12,fontWeight:600,color:P.text}}>Absences</span><span style={{fontSize:12,fontWeight:700,color:P.orange}}>{mAbsTotal}j</span></div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(251,191,36,.06)",padding:"4px 10px",borderRadius:999,border:`1px solid rgba(251,191,36,.12)`}}><span style={{fontSize:11,fontWeight:600,color:P.orange}}>{count}</span><span style={{fontSize:11,color:P.sub}}>{motif}</span></div>))}</div>
-            </div>)}
-          </div>
-          {stats.length>0&&<div style={{...GL,borderRadius:24,padding:"14px 18px",marginTop:10}}>
-            <div style={{fontSize:12,fontWeight:600,color:P.text,marginBottom:10}}>Détail par semaine</div>
-            {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
-              return(<div key={i} style={{marginBottom:i<stats.length-1?8:0}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:11,fontWeight:700,color:P.text}}>S{w.num}</span>
-                    {w.daysIn&&w.daysIn<5&&<span style={{fontSize:9,color:P.muted}}>({w.daysIn}j)</span>}
-                    {w.v&&<ICheck size={10}/>}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+              <div style={{fontSize:24,fontWeight:800,color:P.text}}>{m2h(mTot)} <span style={{fontSize:14,fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
+              {stats.length>0&&<div style={{fontSize:12,fontWeight:600,color:mDiff>0?P.teal:mDiff<0?P.orange:P.blue}}>{mDiff>0?`+${m2h(mDiff)} d'avance`:mDiff<0?`${m2h(Math.abs(mDiff))} restantes`:"À jour"}</div>}
+            </div>
+            <div style={{marginTop:8,height:5,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>{mPct}%</span><span style={{fontSize:9,color:P.muted}}>{mDays}j ouvrés</span></div>
+            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:8}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count}j {motif}</div>))}</div>}
+            {detailMois&&stats.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
+              {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
+                return(<div key={i} style={{marginBottom:i<stats.length-1?8:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:11,fontWeight:700,color:P.text}}>S{w.num}</span>
+                      {w.daysIn&&w.daysIn<5&&<span style={{fontSize:9,color:P.muted}}>({w.daysIn}j)</span>}
+                      {w.v&&<ICheck size={10}/>}
+                    </div>
+                    <span style={{fontSize:11,fontWeight:600,color:col}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(w.obj)}</span></span>
                   </div>
-                  <span style={{fontSize:12,fontWeight:600,color:col}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(w.obj)}</span></span>
-                </div>
-                <div style={{height:4,borderRadius:2,background:P.card,overflow:"hidden"}}>
-                  <div style={{height:"100%",borderRadius:2,background:col,width:`${pc}%`,transition:"width .4s"}}/>
-                </div>
-              </div>);
-            })}
-          </div>}
-          <div style={{marginTop:12,fontSize:14,fontWeight:700,color:P.text,marginBottom:8}}>Tous les relevés</div>
-          {archList.length===0&&<div style={{color:P.muted,fontSize:13,padding:30,textAlign:"center"}}>Aucun relevé</div>}
-          {archList.map(({cle:c,data:d})=>{
-            const wt=d.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0);
-            const al=getLunCle(c);const av=new Date(al.getTime()+4*MS_DAY);
-            return(<button key={c} onClick={()=>setArch({cle:c,data:d})} style={st.archI}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:20,fontWeight:800,color:P.text}}>{m2h(wt)}</div>
-                <div style={{fontSize:12,color:P.sub,marginTop:1}}>{fC(al)} – {fC(av)}</div>
+                  <div style={{height:3,borderRadius:2,background:P.card,overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:col,width:`${pc}%`,transition:"width .4s"}}/></div>
+                </div>);
+              })}
+            </div>}
+          </div>
+
+          {/* Carte 4 — Derniers relevés (accordéon fermé) */}
+          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10,opacity:relOpen?1:.85}}>
+            <button onClick={()=>setRelOpen(!relOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <IDoc size={16}/>
+                <span style={{fontSize:13,fontWeight:700,color:P.text}}>Derniers relevés</span>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>{d.valide&&<ICheck size={12}/>}<span style={{fontSize:10,fontWeight:600,color:P.teal,letterSpacing:.5}}>S{parseInt(c.split("-S")[1])}</span><span style={{color:P.dim,fontSize:18}}>›</span></div>
-            </button>);
-          })}
-          {/* Guide d'utilisation */}
-          <div style={{marginTop:12}}>
-            <div style={{...GL,borderRadius:24,padding:"14px 18px"}}>
-              <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-                  <span style={{fontSize:14,fontWeight:700,color:P.text}}>Guide d'utilisation</span>
-                </div>
-                <span style={{color:P.sub,fontSize:14,transform:guideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+              <span style={{color:P.sub,fontSize:14,transform:relOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+            </button>
+            {relOpen&&<div style={{marginTop:12}}>
+              {archList.length===0&&<div style={{color:P.muted,fontSize:12,textAlign:"center",padding:16}}>Aucun relevé</div>}
+              {archList.slice(0,3).map(({cle:c,data:d})=>{
+                const wt=d.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0);
+                const al=getLunCle(c);const av=new Date(al.getTime()+4*MS_DAY);
+                return(<button key={c} onClick={()=>setArch({cle:c,data:d})} style={{...st.archI,marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
+                    <span style={{fontSize:11,fontWeight:700,color:P.teal,minWidth:28}}>S{parseInt(c.split("-S")[1])}</span>
+                    <span style={{fontSize:12,color:P.sub}}>{fC(al)} – {fC(av)}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:14,fontWeight:700,color:P.text}}>{m2h(wt)}</span>
+                    {d.valide&&<ICheck size={10}/>}
+                  </div>
+                </button>);
+              })}
+              {archList.length>3&&<button onClick={()=>{}} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,width:"100%",textAlign:"center",padding:8,marginTop:4}}>Voir tous les relevés ({archList.length})</button>}
+            </div>}
+          </div>
+
+          {/* Carte 5 — Aide & Notice (accordéon fermé) */}
+          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10,opacity:aideOpen?1:.85}}>
+            <button onClick={()=>setAideOpen(!aideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                <span style={{fontSize:13,fontWeight:700,color:P.text}}>Aide & Notice</span>
+              </div>
+              <span style={{color:P.sub,fontSize:14,transform:aideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+            </button>
+            {aideOpen&&<div style={{marginTop:12}}>
+              <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`}}>
+                <span style={{fontSize:13,color:P.text}}>Guide utilisateur</span><span style={{color:P.dim}}>›</span>
               </button>
-              {guideOpen&&<div style={{marginTop:14,fontSize:12,color:P.sub,lineHeight:1.7}}>
-                <div style={{fontWeight:700,color:P.teal,fontSize:13,marginBottom:8}}>Nouveautés v2.0</div>
-                <div style={{marginBottom:10,fontSize:11}}>Compteur de report automatique · Valorisation des congés et fériés · Verrouillage des relevés · Export PDF simplifié</div>
-                <div style={{height:1,background:P.border,margin:"10px 0"}}/>
+              <button onClick={()=>setShowChangelog(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`}}>
+                <span style={{fontSize:13,color:P.text}}>Nouveautés de la version</span><span style={{color:P.dim}}>›</span>
+              </button>
+              <div style={{padding:"12px 0",borderBottom:`1px solid ${P.border}`}}>
+                <div style={{fontSize:13,color:P.text,marginBottom:8}}>Sauvegarde & Restauration</div>
+                <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:10,background:lastBackup?P.tealDim:"rgba(251,191,36,.08)",marginBottom:10}}>
+                  <div style={{width:6,height:6,borderRadius:3,background:lastBackup?P.teal:P.orange}}/>
+                  <div style={{fontSize:10,color:lastBackup?P.teal:P.orange}}>{lastBackup?`Dernière : ${new Date(lastBackup).toLocaleDateString("fr-FR")}`:"Aucune sauvegarde"}</div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={exporter} style={{...st.cta,flex:1,height:38,fontSize:12}}>Sauvegarder</button>
+                  <button onClick={restaurer} style={{...st.sec,flex:1,fontSize:11,padding:"8px 12px"}}>Restaurer</button>
+                </div>
+              </div>
+              <div style={{padding:"10px 0",fontSize:11,color:P.muted,lineHeight:1.5}}>{/iPhone|iPad|iPod/.test(navigator.userAgent)?"Conservez vos sauvegardes dans iCloud Drive.":/Android/.test(navigator.userAgent)?"Conservez vos sauvegardes dans Google Drive.":"Conservez dans iCloud Drive ou Google Drive."}</div>
+            </div>}
+          </div>
+
+          {/* Guide utilisateur (overlay) */}
+          {guideOpen&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+            <div style={{...GL,borderRadius:28,padding:24,maxWidth:360,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
+              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Guide d'utilisation</div>
+              <div style={{fontSize:12,color:P.sub,lineHeight:1.7}}>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>1. Saisie quotidienne</div>
                 <div style={{marginBottom:10}}>Remplir ses heures chaque jour. Les pauses sont déduites automatiquement. Taper les chiffres directement (ex: 830 → 08:30).</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>2. Absences</div>
                 <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif correspondant.</div>
-                <div style={{marginBottom:4,fontWeight:600,color:P.teal}}>Absences valorisées (comptent dans le compteur) :</div>
-                <div style={{marginBottom:6}}>Congé payé et Jour férié → 8h (contrat 39h) ou 7h (contrat 35h)</div>
-                <div style={{marginBottom:4,fontWeight:600,color:P.muted}}>Absences neutres (aucun impact sur le compteur) :</div>
-                <div style={{marginBottom:10}}>Maladie, Formation, Sans solde, Autre → apparaissent sur le relevé mais n'affectent pas le compteur.</div>
+                <div style={{marginBottom:4,fontWeight:600,color:P.teal}}>Valorisées : Congé payé, Férié → 8h (39h) / 7h (35h)</div>
+                <div style={{marginBottom:10,fontWeight:600,color:P.muted}}>Neutres : Maladie, Sans solde, Autre → aucun impact compteur</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Compteur de report</div>
-                <div style={{marginBottom:6}}>L'écart entre le total comptabilisé (heures travaillées + absences valorisées) et l'objectif (ajusté des absences neutres) est reporté automatiquement.</div>
-                <div style={{marginBottom:6}}>Limites : ±3h maximum par semaine, ±6h maximum cumulé.</div>
-                <div style={{marginBottom:10}}>Le compteur est visible dans le tableau de bord et sur chaque relevé PDF.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Validation et valeur légale</div>
-                <div style={{marginBottom:10}}>Valider la semaine une seule fois, quand les 5 jours sont complets et vérifiés. <strong style={{color:P.orange}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification après validation et envoi ne pourra être prise en compte.</strong></div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Correction exceptionnelle</div>
-                <div style={{marginBottom:10}}>Un relevé validé peut être déverrouillé pour correction (le report est annulé). La correction doit être suivie d'une nouvelle validation et d'un nouvel envoi.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Export PDF</div>
-                <div style={{marginBottom:10}}>Après validation, exporter en PDF puis partager par mail ou AirDrop. Le PDF contient le détail des heures et le compteur de report.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>7. Sauvegardes</div>
-                <div>Effectuer une sauvegarde au minimum une fois par mois depuis le tableau de bord. Conserver le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurer depuis l'écran d'accueil.</div>
-              </div>}
-            </div>
-          </div>
-          {/* Sécurité des données */}
-          <div style={{marginTop:20}}>
-            <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                <span style={{fontSize:14,fontWeight:700,color:P.text}}>Sécurité des données</span>
+                <div style={{marginBottom:10}}>Écart = total comptabilisé − objectif ajusté. Limites : ±3h/semaine, ±6h cumulé.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Validation</div>
+                <div style={{marginBottom:10}}><strong style={{color:P.orange}}>Seul le relevé validé et transmis fait foi. Toute modification après envoi ne sera pas prise en compte.</strong></div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Export PDF</div>
+                <div style={{marginBottom:10}}>Après validation, exporter en PDF et partager par mail ou AirDrop.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Sauvegardes</div>
+                <div>Au minimum 1 fois par mois. Conserver dans iCloud Drive ou Google Drive.</div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:12,background:lastBackup?P.tealDim:"rgba(251,191,36,.08)",marginBottom:12}}>
-                <div style={{width:7,height:7,borderRadius:4,background:lastBackup?P.teal:P.orange}}/>
-                <div>
-                  <div style={{fontSize:11,fontWeight:600,color:lastBackup?P.teal:P.orange}}>{lastBackup?"Dernière sauvegarde":"Aucune sauvegarde"}</div>
-                  {lastBackup&&<div style={{fontSize:10,color:P.sub,marginTop:1}}>{new Date(lastBackup).toLocaleDateString("fr-FR")} à {new Date(lastBackup).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
-                </div>
-              </div>
-              <button onClick={exporter} style={{...st.cta,width:"100%",height:44,fontSize:13,marginBottom:8}}>Sauvegarder</button>
-              <button onClick={restaurer} style={{...st.sec,width:"100%",fontSize:12,padding:"10px 16px"}}>Restaurer</button>
-              <div style={{fontSize:10,color:P.muted,lineHeight:1.5,textAlign:"center",marginTop:8}}>{/iPhone|iPad|iPod/.test(navigator.userAgent)?"Conservez votre sauvegarde dans iCloud Drive.":/Android/.test(navigator.userAgent)?"Conservez votre sauvegarde dans Google Drive.":"Conservez dans iCloud Drive ou Google Drive."}</div>
+              <button onClick={()=>setGuideOpen(false)} style={{...st.sec,width:"100%",marginTop:16}}>Fermer</button>
             </div>
-          </div>
+          </div>}
         </>)}
       </div>
 
