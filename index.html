@@ -46,12 +46,6 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
  * ╚═══════════════════════════════════════════════╝
  */
 const VERSION = "2.0";
-const CHANGELOG = [
-  "Compteur de report d'heures automatique",
-  "Report affiché sur le relevé PDF",
-  "Envoi simplifié — bouton PDF unique",
-  "Popup nouveautés à chaque mise à jour"
-];
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
@@ -238,12 +232,12 @@ window.MonReleve=function MonReleve(){
   const[rk,setRk]=useState(0);
   const[peOpen,setPeOpen]=useState(false);
   const[notesOpen,setNotesOpen]=useState(false);
-  const[showNews,setShowNews]=useState(()=>{try{return localStorage.getItem(`${PX}last_ver`)!==VERSION;}catch{return false;}});
   const[showChangelog,setShowChangelog]=useState(false);
   const[guideOpen,setGuideOpen]=useState(false);
   const[detailMois,setDetailMois]=useState(false);
   const[relOpen,setRelOpen]=useState(false);
   const[aideOpen,setAideOpen]=useState(false);
+  const[savOpen,setSavOpen]=useState(false);
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
 
   const{s:sem,l:lun}=semOff(off);
@@ -460,29 +454,9 @@ window.MonReleve=function MonReleve(){
   );}
 
   // ── Main ──
-  const dismissNews=()=>{setShowNews(false);try{localStorage.setItem(`${PX}last_ver`,VERSION);}catch{}};
-  const NewsPopup=({onClose})=>(
-    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
-      <div style={{...GL,borderRadius:28,padding:28,maxWidth:340,width:"100%",textAlign:"center"}}>
-        <div style={{fontSize:36,marginBottom:8}}>🎉</div>
-        <div style={{fontSize:20,fontWeight:800,color:P.text,marginBottom:4}}>Version {VERSION}</div>
-        <div style={{fontSize:12,color:P.sub,marginBottom:20}}>Nouveautés</div>
-        <div style={{textAlign:"left",marginBottom:24}}>{CHANGELOG.map((item,i)=>(
-          <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:10}}>
-            <span style={{color:P.teal,fontSize:14,lineHeight:1,marginTop:1}}>✓</span>
-            <span style={{fontSize:13,color:P.text,lineHeight:1.4}}>{item}</span>
-          </div>
-        ))}</div>
-        <button onClick={onClose} style={{...st.cta,width:"100%"}}>Compris</button>
-      </div>
-    </div>
-  );
-
   return(
     <div style={st.app}>
       {msg&&<div style={st.toast}>{msg}</div>}
-      {showNews&&ok&&<NewsPopup onClose={dismissNews}/>}
-      {showChangelog&&<NewsPopup onClose={()=>setShowChangelog(false)}/>}
 
       {/* Header compact */}
       <div style={st.header}>
@@ -616,7 +590,7 @@ window.MonReleve=function MonReleve(){
 
         {/* ── TAB TABLEAU DE BORD ── */}
         {tab==="historique"&&(<>
-          {/* Carte 2 — Compteur de report (toujours visible) */}
+          {/* Compteur de report (toujours visible) */}
           {(()=>{const cnt=ldCounter();return(
             <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -635,13 +609,11 @@ window.MonReleve=function MonReleve(){
             </div>
           );})()}
 
-          {/* Carte 3 — Mois en cours (toujours visible) */}
+          {/* Mois en cours (toujours visible) */}
           <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span style={{fontSize:11,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
-              </div>
-              {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600}}>Détail du mois {detailMois?"▴":"›"}</button>}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontSize:12,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
+              {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,padding:"4px 0"}}>Détail {detailMois?"▴":"›"}</button>}
             </div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
               <div style={{fontSize:24,fontWeight:800,color:P.text}}>{m2h(mTot)} <span style={{fontSize:14,fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
@@ -649,17 +621,13 @@ window.MonReleve=function MonReleve(){
             </div>
             <div style={{marginTop:8,height:5,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>{mPct}%</span><span style={{fontSize:9,color:P.muted}}>{mDays}j ouvrés</span></div>
-            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:8}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count}j {motif}</div>))}</div>}
-            {detailMois&&stats.length>0&&<div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
+            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count}j {motif}</div>))}</div>}
+            {detailMois&&stats.length>0&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${P.border}`}}>
               {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
-                return(<div key={i} style={{marginBottom:i<stats.length-1?8:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{fontSize:11,fontWeight:700,color:P.text}}>S{w.num}</span>
-                      {w.daysIn&&w.daysIn<5&&<span style={{fontSize:9,color:P.muted}}>({w.daysIn}j)</span>}
-                      {w.v&&<ICheck size={10}/>}
-                    </div>
-                    <span style={{fontSize:11,fontWeight:600,color:col}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(w.obj)}</span></span>
+                return(<div key={i} style={{marginBottom:i<stats.length-1?6:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:10,fontWeight:700,color:P.text}}>S{w.num}</span>{w.daysIn&&w.daysIn<5&&<span style={{fontSize:8,color:P.muted}}>({w.daysIn}j)</span>}{w.v&&<ICheck size={9}/>}</div>
+                    <span style={{fontSize:10,fontWeight:600,color:col}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(w.obj)}</span></span>
                   </div>
                   <div style={{height:3,borderRadius:2,background:P.card,overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:col,width:`${pc}%`,transition:"width .4s"}}/></div>
                 </div>);
@@ -667,38 +635,50 @@ window.MonReleve=function MonReleve(){
             </div>}
           </div>
 
-          {/* Carte 4 — Derniers relevés (accordéon fermé) */}
-          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10,opacity:relOpen?1:.85}}>
-            <button onClick={()=>setRelOpen(!relOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <IDoc size={16}/>
-                <span style={{fontSize:13,fontWeight:700,color:P.text}}>Derniers relevés</span>
-              </div>
+          {/* Derniers relevés (accordéon fermé) */}
+          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
+            <button onClick={()=>setRelOpen(!relOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0,WebkitTapHighlightColor:"transparent"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}><IDoc size={16}/><span style={{fontSize:13,fontWeight:700,color:P.text}}>Derniers relevés</span></div>
               <span style={{color:P.sub,fontSize:14,transform:relOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
             </button>
             {relOpen&&<div style={{marginTop:12}}>
-              {archList.length===0&&<div style={{color:P.muted,fontSize:12,textAlign:"center",padding:16}}>Aucun relevé</div>}
+              {archList.length===0&&<div style={{color:P.muted,fontSize:12,textAlign:"center",padding:12}}>Aucun relevé</div>}
               {archList.slice(0,3).map(({cle:c,data:d})=>{
                 const wt=d.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0);
                 const al=getLunCle(c);const av=new Date(al.getTime()+4*MS_DAY);
                 return(<button key={c} onClick={()=>setArch({cle:c,data:d})} style={{...st.archI,marginBottom:6}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
                     <span style={{fontSize:11,fontWeight:700,color:P.teal,minWidth:28}}>S{parseInt(c.split("-S")[1])}</span>
-                    <span style={{fontSize:12,color:P.sub}}>{fC(al)} – {fC(av)}</span>
+                    <span style={{fontSize:11,color:P.sub}}>{fC(al)} – {fC(av)}</span>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:14,fontWeight:700,color:P.text}}>{m2h(wt)}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:P.text}}>{m2h(wt)}</span>
                     {d.valide&&<ICheck size={10}/>}
                   </div>
                 </button>);
               })}
-              {archList.length>3&&<button onClick={()=>{}} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,width:"100%",textAlign:"center",padding:8,marginTop:4}}>Voir tous les relevés ({archList.length})</button>}
+              {archList.length>3&&<div style={{textAlign:"center",paddingTop:6}}>
+                {archList.slice(3).map(({cle:c,data:d})=>{
+                  const wt=d.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0);
+                  const al=getLunCle(c);const av=new Date(al.getTime()+4*MS_DAY);
+                  return(<button key={c} onClick={()=>setArch({cle:c,data:d})} style={{...st.archI,marginBottom:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
+                      <span style={{fontSize:11,fontWeight:700,color:P.teal,minWidth:28}}>S{parseInt(c.split("-S")[1])}</span>
+                      <span style={{fontSize:11,color:P.sub}}>{fC(al)} – {fC(av)}</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:13,fontWeight:700,color:P.text}}>{m2h(wt)}</span>
+                      {d.valide&&<ICheck size={10}/>}
+                    </div>
+                  </button>);
+                })}
+              </div>}
             </div>}
           </div>
 
-          {/* Carte 5 — Aide & Notice (accordéon fermé) */}
-          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10,opacity:aideOpen?1:.85}}>
-            <button onClick={()=>setAideOpen(!aideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+          {/* Aide & Notice (accordéon fermé) */}
+          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
+            <button onClick={()=>setAideOpen(!aideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0,WebkitTapHighlightColor:"transparent"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                 <span style={{fontSize:13,fontWeight:700,color:P.text}}>Aide & Notice</span>
@@ -706,48 +686,86 @@ window.MonReleve=function MonReleve(){
               <span style={{color:P.sub,fontSize:14,transform:aideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
             </button>
             {aideOpen&&<div style={{marginTop:12}}>
-              <button onClick={()=>setGuideOpen(!guideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`}}>
+              <button onClick={()=>setGuideOpen(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`,WebkitTapHighlightColor:"transparent"}}>
                 <span style={{fontSize:13,color:P.text}}>Guide utilisateur</span><span style={{color:P.dim}}>›</span>
               </button>
-              <button onClick={()=>setShowChangelog(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`}}>
+              <button onClick={()=>setShowChangelog(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",WebkitTapHighlightColor:"transparent"}}>
                 <span style={{fontSize:13,color:P.text}}>Nouveautés de la version</span><span style={{color:P.dim}}>›</span>
               </button>
-              <div style={{padding:"12px 0",borderBottom:`1px solid ${P.border}`}}>
-                <div style={{fontSize:13,color:P.text,marginBottom:8}}>Sauvegarde & Restauration</div>
-                <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:10,background:lastBackup?P.tealDim:"rgba(251,191,36,.08)",marginBottom:10}}>
-                  <div style={{width:6,height:6,borderRadius:3,background:lastBackup?P.teal:P.orange}}/>
-                  <div style={{fontSize:10,color:lastBackup?P.teal:P.orange}}>{lastBackup?`Dernière : ${new Date(lastBackup).toLocaleDateString("fr-FR")}`:"Aucune sauvegarde"}</div>
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={exporter} style={{...st.cta,flex:1,height:38,fontSize:12}}>Sauvegarder</button>
-                  <button onClick={restaurer} style={{...st.sec,flex:1,fontSize:11,padding:"8px 12px"}}>Restaurer</button>
-                </div>
+            </div>}
+          </div>
+
+          {/* Sauvegarde des données (accordéon fermé) */}
+          <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
+            <button onClick={()=>setSavOpen(!savOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0,WebkitTapHighlightColor:"transparent"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={P.teal} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span style={{fontSize:13,fontWeight:700,color:P.text}}>Sauvegarde des données</span>
+                {!lastBackup&&<div style={{width:6,height:6,borderRadius:3,background:P.orange,marginLeft:2}}/>}
               </div>
-              <div style={{padding:"10px 0",fontSize:11,color:P.muted,lineHeight:1.5}}>{/iPhone|iPad|iPod/.test(navigator.userAgent)?"Conservez vos sauvegardes dans iCloud Drive.":/Android/.test(navigator.userAgent)?"Conservez vos sauvegardes dans Google Drive.":"Conservez dans iCloud Drive ou Google Drive."}</div>
+              <span style={{color:P.sub,fontSize:14,transform:savOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+            </button>
+            {savOpen&&<div style={{marginTop:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:10,background:lastBackup?P.tealDim:"rgba(251,191,36,.08)",marginBottom:10}}>
+                <div style={{width:6,height:6,borderRadius:3,background:lastBackup?P.teal:P.orange}}/>
+                <div style={{fontSize:10,color:lastBackup?P.teal:P.orange}}>{lastBackup?`Dernière : ${new Date(lastBackup).toLocaleDateString("fr-FR")} à ${new Date(lastBackup).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}`:"Aucune sauvegarde"}</div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={exporter} style={{...st.cta,flex:1,height:38,fontSize:12}}>Sauvegarder</button>
+                <button onClick={restaurer} style={{...st.sec,flex:1,fontSize:11,padding:"8px 12px"}}>Restaurer</button>
+              </div>
+              <div style={{fontSize:10,color:P.muted,lineHeight:1.5,textAlign:"center",marginTop:8}}>{/iPhone|iPad|iPod/.test(navigator.userAgent)?"Conservez vos sauvegardes dans iCloud Drive.":/Android/.test(navigator.userAgent)?"Conservez vos sauvegardes dans Google Drive.":"Conservez dans iCloud Drive ou Google Drive."}</div>
             </div>}
           </div>
 
           {/* Guide utilisateur (overlay) */}
-          {guideOpen&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
-            <div style={{...GL,borderRadius:28,padding:24,maxWidth:360,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
-              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Guide d'utilisation</div>
+          {guideOpen&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+            <div style={{...GL,borderRadius:28,padding:24,maxWidth:380,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
+              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:4}}>Guide d'utilisation</div>
+              <div style={{fontSize:11,color:P.muted,marginBottom:16}}>Mon Relevé v{VERSION}</div>
               <div style={{fontSize:12,color:P.sub,lineHeight:1.7}}>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>1. Saisie quotidienne</div>
-                <div style={{marginBottom:10}}>Remplir ses heures chaque jour. Les pauses sont déduites automatiquement. Taper les chiffres directement (ex: 830 → 08:30).</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>2. Absences</div>
-                <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif correspondant.</div>
-                <div style={{marginBottom:4,fontWeight:600,color:P.teal}}>Valorisées : Congé payé, Férié → 8h (39h) / 7h (35h)</div>
-                <div style={{marginBottom:10,fontWeight:600,color:P.muted}}>Neutres : Maladie, Sans solde, Autre → aucun impact compteur</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>3. Compteur de report</div>
-                <div style={{marginBottom:10}}>Écart = total comptabilisé − objectif ajusté. Limites : ±3h/semaine, ±6h cumulé.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>4. Validation</div>
-                <div style={{marginBottom:10}}><strong style={{color:P.orange}}>Seul le relevé validé et transmis fait foi. Toute modification après envoi ne sera pas prise en compte.</strong></div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>5. Export PDF</div>
-                <div style={{marginBottom:10}}>Après validation, exporter en PDF et partager par mail ou AirDrop.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>6. Sauvegardes</div>
-                <div>Au minimum 1 fois par mois. Conserver dans iCloud Drive ou Google Drive.</div>
+                <div style={{fontWeight:700,color:P.teal,fontSize:13,marginBottom:6}}>Présentation</div>
+                <div style={{marginBottom:12}}>Mon Relevé est votre outil de suivi d'heures hebdomadaire. Il calcule automatiquement vos heures travaillées, gère les absences et le compteur de report d'heures.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Saisie des heures</div>
+                <div style={{marginBottom:4}}>Chaque jour, saisissez votre heure d'arrivée et de départ. Tapez les chiffres directement (ex: 830 → 08:30, 1730 → 17:30).</div>
+                <div style={{marginBottom:4}}>Le pointage rapide permet d'enregistrer l'heure exacte en un tap (boutons ↓ et ↑).</div>
+                <div style={{marginBottom:12}}>Les pauses (10:00-10:15 et 12:30-13:15) sont déduites automatiquement.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Validation</div>
+                <div style={{marginBottom:4}}>En fin de semaine, vérifiez vos heures puis tapez "Valider et envoyer".</div>
+                <div style={{marginBottom:12,color:P.orange,fontWeight:600}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification après envoi ne sera pas prise en compte.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Absences</div>
+                <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
+                  <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié → comptent 8h (39h) ou 7h (35h) dans le calcul</div>
+                <div style={{marginBottom:12,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
+                  <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → aucun impact sur le compteur, l'objectif est ajusté</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Compteur de report</div>
+                <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
+                <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul.</div>
+                <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)",fontSize:11}}>
+                  <strong>Exemple :</strong> Semaine à 41h sur contrat 39h → écart +2h → compteur passe de 0 à +2h.</div>
+                <div style={{marginBottom:12}}>Le compteur est recalculé automatiquement en cas de modification ou suppression d'un relevé.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Relevé PDF</div>
+                <div style={{marginBottom:12}}>Le PDF contient : heures travaillées, absences valorisées, total comptabilisé, objectif ajusté, et le détail du compteur de report.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Semaines à cheval</div>
+                <div style={{marginBottom:12}}>Le relevé reste hebdomadaire. Les statistiques mensuelles répartissent automatiquement les jours dans le mois concerné.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Sauvegarde</div>
+                <div>Effectuez une sauvegarde au minimum 1 fois par mois depuis le tableau de bord. Conservez le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurez depuis l'écran d'accueil.</div>
               </div>
               <button onClick={()=>setGuideOpen(false)} style={{...st.sec,width:"100%",marginTop:16}}>Fermer</button>
+            </div>
+          </div>}
+
+          {/* Nouveautés de la version (overlay) */}
+          {showChangelog&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+            <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%"}}>
+              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Nouveautés</div>
+              <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2.0</div>
+              <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:16}}>
+                {["Compteur de report automatique","Affichage du compteur dans le PDF","Gestion des absences valorisées et neutres","Verrouillage des relevés validés","Export PDF simplifié","Tableau de bord restructuré","Guide utilisateur complet"].map((item,i)=>(
+                  <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:P.teal}}>✓</span><span>{item}</span></div>
+                ))}
+              </div>
+              <button onClick={()=>setShowChangelog(false)} style={{...st.sec,width:"100%"}}>Fermer</button>
             </div>
           </div>}
         </>)}
