@@ -45,18 +45,27 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
  * ║  Compteur report · PDF simplifié · Nouveautés ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.0";
+const VERSION = "2.1";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
 const MOTIFS_NEUTRES = ["Maladie","Sans solde","Autre"];
-function absValJour(contrat){const h=H_OBJ[contrat]||DEF_OBJ;return h>=39?480:420;}
+function objJour(ct){return ct==="CDI — 39h"?468:420;} // compteur : 7h48 ou 7h
+function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // PDF : 8h ou 7h
 function calcReport(jours,contrat,cfg){
-  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=absValJour(contrat);
-  let travaille=0,valorise=0,neutre=0;
-  jours.forEach(j=>{if(!j.absence){travaille+=cNet(j.arrivee,j.depart,cfg);}else if(MOTIFS_VALORISES.includes(j.motif)){valorise+=dv;}else if(MOTIFS_NEUTRES.includes(j.motif)){neutre+=dv;}});
+  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvP=absAffJour(contrat);
+  let travaille=0,valorise=0,neutre=0,valorisePDF=0;
+  jours.forEach(j=>{
+    if(!j.absence){travaille+=cNet(j.arrivee,j.depart,cfg);}
+    else{
+      const mult=j.demiJournee?0.5:1;
+      if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
+      if(MOTIFS_VALORISES.includes(j.motif)){valorise+=Math.round(dv*mult);valorisePDF+=Math.round(dvP*mult);}
+      else if(MOTIFS_NEUTRES.includes(j.motif)){neutre+=Math.round(dv*mult);}
+    }
+  });
   const objAjuste=objM-neutre;const total=travaille+valorise;const ecart=total-objAjuste;
-  return{travaille,valorise,neutre,objAjuste,total,ecart};
+  return{travaille,valorise,neutre,objAjuste,total,ecart,valorisePDF};
 }
 
 // ── Constants ──
@@ -64,8 +73,8 @@ const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
 const D_PM_H = "10:00", D_PM_F = "10:15", D_PD_D = "12:30", D_PD_F = "13:15";
 const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
 const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Autre"];
-const CONTRATS = ["CDI — 35h","CDI — 39h","CDI — Temps partiel","CDD","CDD — Temps partiel","Apprentissage","Intérim","Autre"];
-const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39,"CDI — Temps partiel":28,CDD:35,"CDD — Temps partiel":28,Apprentissage:35,Intérim:35,Autre:35};
+const CONTRATS = ["CDI — 35h","CDI — 39h"];
+const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39};
 const MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 const MOIS_C = ["jan.","fév.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
 const MOIS_U = ["JANVIER","FÉVRIER","MARS","AVRIL","MAI","JUIN","JUILLET","AOÛT","SEPTEMBRE","OCTOBRE","NOVEMBRE","DÉCEMBRE"];
@@ -108,8 +117,8 @@ function hNow(){const d=new Date();return`${String(d.getHours()).padStart(2,"0")
 
 // ── Storage ──
 const PX="mr_";
-const vide=s=>({cle:cleS(s),valide:false,valideA:null,notes:"",report:null,jours:Array.from({length:5},()=>({arrivee:"",depart:"",absence:false,motif:"",motifAutre:""}))});
-function ldSem(c,n){try{const r=localStorage.getItem(`${PX}${n}_${c}`);if(r){const d=JSON.parse(r);return{cle:d.cle||d.key||c,valide:d.valide!==undefined?d.valide:!!d.v,valideA:d.valideA||d.at||null,notes:d.notes||"",report:d.report||null,jours:(d.jours||d.days||[]).map(j=>({arrivee:j.arrivee||j.a||"",depart:j.depart||j.d||"",absence:j.absence!==undefined?j.absence:!!j.abs,motif:j.motif||j.mot||"",motifAutre:j.motifAutre||j.motA||""}))};}}catch(e){console.warn(e);}return null;}
+const vide=s=>({cle:cleS(s),valide:false,valideA:null,notes:"",report:null,jours:Array.from({length:5},()=>({arrivee:"",depart:"",absence:false,motif:"",motifAutre:"",demiJournee:false}))});
+function ldSem(c,n){try{const r=localStorage.getItem(`${PX}${n}_${c}`);if(r){const d=JSON.parse(r);return{cle:d.cle||d.key||c,valide:d.valide!==undefined?d.valide:!!d.v,valideA:d.valideA||d.at||null,notes:d.notes||"",report:d.report||null,jours:(d.jours||d.days||[]).map(j=>({arrivee:j.arrivee||j.a||"",depart:j.depart||j.d||"",absence:j.absence!==undefined?j.absence:!!j.abs,motif:j.motif||j.mot||"",motifAutre:j.motifAutre||j.motA||"",demiJournee:!!j.demiJournee}))};}}catch(e){console.warn(e);}return null;}
 function svSem(c,n,d){try{localStorage.setItem(`${PX}${n}_${c}`,JSON.stringify(d));}catch(e){console.warn(e);}}
 function delSem(c,n){try{localStorage.removeItem(`${PX}${n}_${c}`);}catch{}}
 function ldCounter(){try{const v=localStorage.getItem(`${PX}report_counter`);return v?parseInt(v):0;}catch{return 0;}}
@@ -253,7 +262,7 @@ window.MonReleve=function MonReleve(){
   const toastRef=useRef(null);
   const flash=m=>{setMsg(m);if(toastRef.current)clearTimeout(toastRef.current);toastRef.current=setTimeout(()=>setMsg(""),TOAST_MS);};
   useEffect(()=>()=>{if(toastRef.current)clearTimeout(toastRef.current);},[]);
-  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";}return u;});sv({...wd,jours:nj});};
+  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";u.demiJournee=false;}return u;});sv({...wd,jours:nj});};
   const pointer=(i,f)=>{mj(i,f,hNow());flash(`${f==="arrivee"?"Arrivée":"Départ"} ${hNow()}`);};
   const valider=()=>{
     if(!wd)return;
@@ -262,7 +271,7 @@ window.MonReleve=function MonReleve(){
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,avant+reportable));
     const applique=apres-avant;
-    const report={avant,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:rpt.valorise,neutre:rpt.neutre,objAjuste:rpt.objAjuste};
+    const report={avant,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:rpt.valorise,neutre:rpt.neutre,objAjuste:rpt.objAjuste,valorisePDF:rpt.valorisePDF};
     svCounter(apres);
     sv({...wd,valide:true,valideA:new Date().toISOString(),report});
     setPop(true);flash("Semaine validée ✓");
@@ -331,7 +340,8 @@ window.MonReleve=function MonReleve(){
         <thead><tr>{["Jour","Date","Arrivée","Départ","Pause","Net"].map((h,i)=><th key={h} style={{padding:"7px 4px",fontSize:8,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,textAlign:i===0?"left":"center",color:pk.sub,borderBottom:`2px solid ${pk.text}`,borderRight:i<5?`1px solid ${pk.border}`:"none",background:"#F9FAFB"}}>{h}</th>)}</tr></thead>
         <tbody>
           {data.jours.map((j,i)=>{const d=new Date(l2);d.setDate(d.getDate()+i);
-            if(j.absence){const mt=j.motif==="Autre"?(j.motifAutre||"Autre"):j.motif;return(<tr key={i} style={{background:"#FFF8F0"}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td colSpan={3} style={{...cell,color:pk.orange,fontWeight:500}}>{mt}</td><td style={{...cellEnd,color:pk.text}}>—</td></tr>);}
+            if(j.absence&&!j.demiJournee){const mt=j.motif==="Autre"?(j.motifAutre||"Autre"):j.motif;return(<tr key={i} style={{background:"#FFF8F0"}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td colSpan={3} style={{...cell,color:pk.orange,fontWeight:500}}>{mt}</td><td style={{...cellEnd,color:pk.text}}>—</td></tr>);}
+            if(j.absence&&j.demiJournee){const mt=j.motif==="Autre"?(j.motifAutre||"Autre"):j.motif;const n=cNet(j.arrivee,j.depart,pr);cu+=n;return(<tr key={i} style={{background:"#FFF8F0"}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td style={cell}>{j.arrivee||"—"}</td><td style={cell}>{j.depart||"—"}</td><td style={{...cell,color:pk.orange,fontSize:9}}>½ {mt}</td><td style={{...cellEnd,fontWeight:700}}>{j.arrivee&&j.depart?m2h(n):"—"}</td></tr>);}
             const n=cNet(j.arrivee,j.depart,pr);cu+=n;
             return(<tr key={i} style={i%2?{background:"#FAFBFC"}:{}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td style={cell}>{j.arrivee||"—"}</td><td style={cell}>{j.depart||"—"}</td><td style={cell}>{j.arrivee&&j.depart?m2h(cPause(j.arrivee,j.depart,pr)):"—"}</td><td style={{...cellEnd,fontWeight:700}}>{j.arrivee&&j.depart?m2h(n):"—"}</td></tr>);
           })}
@@ -345,14 +355,14 @@ window.MonReleve=function MonReleve(){
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`1px solid #DBEAFE`}}>
           <span style={{fontSize:10,color:pk.sub}}>Heures travaillées</span><span style={{fontSize:12}}>{m2h(data.report.travaille||cu)}</span>
         </div>
-        {data.report.valorise>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
-          <span style={{fontSize:10,color:"#059669"}}>Absences valorisées (CP/Férié)</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(data.report.valorise)}</span>
+        {(data.report.valorisePDF||data.report.valorise)>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{fontSize:10,color:"#059669"}}>Absences valorisées (CP/Férié)</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(data.report.valorisePDF||data.report.valorise)}</span>
         </div>}
         {data.report.neutre>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
           <span style={{fontSize:10,color:pk.sub}}>Absences neutres (objectif ajusté)</span><span style={{fontSize:10,color:pk.muted}}>−{m2h(data.report.neutre)}</span>
         </div>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px"}}>
-          <span style={{fontSize:11,fontWeight:700,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorise||0))}</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorisePDF||data.report.valorise||0))}</span>
         </div>
         <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",marginTop:6}}>
           <span style={{fontSize:10,color:pk.sub}}>Objectif{data.report.neutre>0?" ajusté":""}</span><span>{m2h(data.report.objAjuste||(H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
@@ -486,7 +496,7 @@ window.MonReleve=function MonReleve(){
         <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
             <div>
-              <div style={{fontSize:10,color:P.sub,fontWeight:500,textTransform:"uppercase",letterSpacing:.5}}>Temps déclaré</div>
+              <div style={{fontSize:10,color:P.sub,fontWeight:500,textTransform:"uppercase",letterSpacing:.5}}>Temps travaillé</div>
               <div style={{fontSize:34,fontWeight:800,color:P.text,letterSpacing:-2,marginTop:2}}>{m2h(totMin)}</div>
             </div>
             <div style={{textAlign:"right",marginBottom:4}}>
@@ -530,7 +540,29 @@ window.MonReleve=function MonReleve(){
           </div>}
           {dayOrder.map(i=>{
             const j=wd.jours[i];
-            if(j.absence)return<div key={i} style={{...st.dc,...(wd.valide?{opacity:.7}:{})}}><div style={st.dRow}><span style={st.dN}>{JOURS[i]}</span><span style={st.absP}>{j.motif==="Autre"?(j.motifAutre||"Absence"):j.motif}</span></div></div>;
+            if(j.absence&&!j.demiJournee)return<div key={i} style={{...st.dc,...(wd.valide?{opacity:.7}:{})}}><div style={st.dRow}><span style={st.dN}>{JOURS[i]}</span><span style={st.absP}>{j.motif==="Autre"?(j.motifAutre||"Absence"):j.motif}</span></div></div>;
+            if(j.absence&&j.demiJournee){const n=cNet(j.arrivee,j.depart,pr);const ok2=j.arrivee&&j.depart;
+              return(<div key={i} style={{...st.dc,...(wd.valide?{opacity:.7}:{})}}>
+                <div style={st.dRow}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}><span style={st.dN}>{JOURS[i]}</span><span style={{...st.absP,fontSize:9}}>½ {j.motif==="Autre"?(j.motifAutre||"Absence"):j.motif}</span></div>
+                  {ok2&&<span style={st.netP}>{m2h(n)}</span>}
+                </div>
+                {wd.valide?
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"center",marginTop:6}}>
+                    <div style={{textAlign:"center",padding:"10px 12px",fontSize:15,fontWeight:600,color:P.sub}}>{j.arrivee||"–:–"}</div>
+                    <div style={{color:P.dim,fontSize:12}}>→</div>
+                    <div style={{textAlign:"center",padding:"10px 12px",fontSize:15,fontWeight:600,color:P.sub}}>{j.depart||"–:–"}</div>
+                  </div>
+                :
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"start",marginTop:6}}>
+                    <TimeInput value={j.arrivee} onChange={v=>mj(i,"arrivee",v)} label="Arrivée"/>
+                    <div style={{color:P.dim,marginTop:22,fontSize:12}}>→</div>
+                    <TimeInput value={j.depart} onChange={v=>mj(i,"depart",v)} label="Départ"/>
+                  </div>
+                }
+                {ok2&&<div style={{fontSize:11,color:P.sub,marginTop:4}}>Pause {m2h(cPause(j.arrivee,j.depart,pr))} · Net {m2h(n)}</div>}
+              </div>);
+            }
             const n=cNet(j.arrivee,j.depart,pr);const isT=cur&&i===ti&&!isWeekend;const ok2=j.arrivee&&j.depart;
             return(<div key={i} style={{...st.dc,...(isT&&!wd.valide?{border:`1.5px solid ${P.teal}`,boxShadow:`0 0 16px ${P.teal}15`}:{}),...(wd.valide?{opacity:.7}:{})}}>
               <div style={st.dRow}>
@@ -583,6 +615,7 @@ window.MonReleve=function MonReleve(){
             </label>
             {j.absence&&(<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>mj(i,"motif",m)} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
+              {j.motif&&<div style={{display:"flex",gap:8,marginTop:10}}>{[{l:"Journée",v:false},{l:"Demi-journée",v:true}].map(o=><button key={o.l} onClick={()=>mj(i,"demiJournee",o.v)} style={{...st.mP,flex:1,...(j.demiJournee===o.v?{background:P.teal,color:P.bg}:{})}}>{o.l}</button>)}</div>}
               {j.motif==="Autre"&&<input type="text" placeholder="Précisez…" value={j.motifAutre} onChange={e=>mj(i,"motifAutre",e.target.value)} style={{...st.fi,marginTop:8,padding:"10px 14px",fontSize:13}}/>}
             </div>)}
           </div>))}
@@ -734,10 +767,13 @@ window.MonReleve=function MonReleve(){
                 <div style={{marginBottom:4}}>En fin de semaine, vérifiez vos heures puis tapez "Valider et envoyer".</div>
                 <div style={{marginBottom:12,color:P.orange,fontWeight:600}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification après envoi ne sera pas prise en compte.</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Absences</div>
+                <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif. Choisir entre journée complète ou demi-journée.</div>
                 <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
-                  <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié → comptent 8h (39h) ou 7h (35h) dans le calcul</div>
-                <div style={{marginBottom:12,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
-                  <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → aucun impact sur le compteur, l'objectif est ajusté</div>
+                  <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié<br/>
+                  <span style={{fontSize:11}}>Journée : 8h (39h) / 7h (35h) · Demi-journée : 4h (39h) / 3h30 (35h)</span></div>
+                <div style={{marginBottom:6,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
+                  <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → aucun impact sur le compteur</div>
+                <div style={{marginBottom:12,fontSize:10,color:P.dim,fontStyle:"italic"}}>Les valeurs affichées sur le PDF sont les valorisations officielles (8h/4h). Le compteur utilise l'objectif journalier exact (7h48 pour 39h) pour garantir la neutralité.</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Compteur de report</div>
                 <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
                 <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul.</div>
@@ -759,6 +795,12 @@ window.MonReleve=function MonReleve(){
           {showChangelog&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
             <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%"}}>
               <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Nouveautés</div>
+              <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2.1</div>
+              <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:12}}>
+                {["Demi-journées d'absence","Double valorisation PDF / compteur","Objectif journalier précis (7h48 / 7h)","Tableau de bord restructuré","Notice utilisateur complète"].map((item,i)=>(
+                  <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:P.teal}}>✓</span><span>{item}</span></div>
+                ))}
+              </div>
               <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2.0</div>
               <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:16}}>
                 {["Compteur de report automatique","Affichage du compteur dans le PDF","Gestion des absences valorisées et neutres","Verrouillage des relevés validés","Export PDF simplifié","Tableau de bord restructuré","Guide utilisateur complet"].map((item,i)=>(
