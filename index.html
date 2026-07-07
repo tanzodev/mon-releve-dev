@@ -53,19 +53,19 @@ const MOTIFS_NEUTRES = ["Maladie","Sans solde","Autre"];
 function objJour(ct){return ct==="CDI — 39h"?468:420;} // compteur : 7h48 ou 7h
 function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // PDF : 8h ou 7h
 function calcReport(jours,contrat,cfg){
-  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvP=absAffJour(contrat);
-  let travaille=0,valorise=0,neutre=0,valorisePDF=0;
+  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvAbs=absAffJour(contrat);
+  let travaille=0,valorise=0,neutre=0;
   jours.forEach(j=>{
     if(!j.absence){travaille+=cNet(j.arrivee,j.depart,cfg);}
     else{
       const mult=j.demiJournee?0.5:1;
       if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
-      if(MOTIFS_VALORISES.includes(j.motif)){valorise+=Math.round(dv*mult);valorisePDF+=Math.round(dvP*mult);}
+      if(MOTIFS_VALORISES.includes(j.motif)){valorise+=Math.round(dvAbs*mult);}
       else if(MOTIFS_NEUTRES.includes(j.motif)){neutre+=Math.round(dv*mult);}
     }
   });
   const objAjuste=objM-neutre;const total=travaille+valorise;const ecart=total-objAjuste;
-  return{travaille,valorise,neutre,objAjuste,total,ecart,valorisePDF};
+  return{travaille,valorise,neutre,objAjuste,total,ecart,valorisePDF:valorise};
 }
 
 // ── Constants ──
@@ -145,19 +145,27 @@ function allSem(n){try{const pfx=`${PX}${n}_`;return Object.keys(localStorage).f
 function mStats(n,ct,semNum,cfg){
   const now=new Date();const mo=now.getMonth(),yr=now.getFullYear();
   const dailyObj=((H_OBJ[ct]||DEF_OBJ)*60)/5;
+  const dvAbs=absAffJour(ct);const dv=objJour(ct);
   const results=[];
   allSem(n).forEach(({cle,data})=>{
     const lun=getLunCle(cle);const num=parseInt(cle.split("-S")[1]);
-    let daysIn=0,tot=0,absCount=0;const absMotifs={};
+    let daysIn=0,tot=0,absCount=0,neutreM=0;const absMotifs={};
     data.jours.forEach((j,i)=>{
       const day=new Date(lun);day.setDate(day.getDate()+i);
       if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
       daysIn++;
-      if(j.absence){absCount++;const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+1;}
+      if(j.absence){
+        const mult=j.demiJournee?0.5:1;
+        absCount+=mult;
+        const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
+        if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
+        if(MOTIFS_VALORISES.includes(j.motif)){tot+=Math.round(dvAbs*mult);}
+        else if(MOTIFS_NEUTRES.includes(j.motif)){neutreM+=Math.round(dv*mult);}
+      }
       else{tot+=cNet(j.arrivee,j.depart,cfg);}
     });
     if(daysIn===0)return;
-    const obj=Math.round(daysIn*dailyObj);
+    const obj=Math.round(daysIn*dailyObj)-neutreM;
     results.push({num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
   });
   return results.sort((a,b)=>a.num-b.num);
@@ -797,7 +805,7 @@ window.MonReleve=function MonReleve(){
               <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Nouveautés</div>
               <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2.1</div>
               <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:12}}>
-                {["Demi-journées d'absence","Double valorisation PDF / compteur","Objectif journalier précis (7h48 / 7h)","Tableau de bord restructuré","Notice utilisateur complète"].map((item,i)=>(
+                {["Demi-journées d'absence","CP/Férié : valeur unique (8h/4h ou 7h/3h30)","Correction écart artificiel compteur","Statistiques mensuelles avec absences valorisées","Tableau de bord restructuré","Notice utilisateur complète"].map((item,i)=>(
                   <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:P.teal}}>✓</span><span>{item}</span></div>
                 ))}
               </div>

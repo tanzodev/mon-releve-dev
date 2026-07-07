@@ -4,7 +4,7 @@
  */
 
 const APP_VERSION = '2.1';
-const CACHE_CORE = 'mr-core-v2.1.5';
+const CACHE_CORE = 'mr-core-v2.1.6';
 const CACHE_CDN = 'mr-cdn-v1';
 
 // Core assets (versioned — cleared on update)
@@ -30,7 +30,6 @@ self.addEventListener('install', event => {
     Promise.all([
       caches.open(CACHE_CORE).then(cache => cache.addAll(CORE_ASSETS)),
       caches.open(CACHE_CDN).then(cache =>
-        // Only add CDN assets if not already cached
         Promise.all(CDN_ASSETS.map(url =>
           cache.match(url).then(existing => existing || cache.add(url))
         ))
@@ -49,7 +48,6 @@ self.addEventListener('activate', event => {
       ))
       .then(() => self.clients.claim())
       .then(() => {
-        // Notify all clients that a new version is active
         self.clients.matchAll().then(clients => {
           clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: APP_VERSION }));
         });
@@ -60,26 +58,18 @@ self.addEventListener('activate', event => {
 // ── Fetch strategy ──
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
-
-  // Skip chrome-extension, blob, data URLs
   if (!url.protocol.startsWith('http')) return;
 
-  // Strategy for index.html / navigation: Network-first with cache fallback
-  // This ensures updates are picked up quickly while still working offline
   if (event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          // Cache the fresh copy
           const clone = response.clone();
           caches.open(CACHE_CORE).then(cache => cache.put(event.request, clone));
           return response;
         })
         .catch(() => {
-          // Offline: serve from cache
           return caches.match(event.request)
             .then(cached => cached || caches.match('./index.html'))
             .then(cached => cached || new Response('Hors ligne — veuillez vous reconnecter.', {
@@ -91,7 +81,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Strategy for CDN scripts: Cache-first (they're versioned by URL)
   if (CDN_ASSETS.some(cdn => event.request.url.startsWith(cdn.split('@')[0]))) {
     event.respondWith(
       caches.match(event.request)
@@ -108,7 +97,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Strategy for manifest.json and sw.js: Network-first
   if (url.pathname.endsWith('.json') || url.pathname.endsWith('.js')) {
     event.respondWith(
       fetch(event.request)
@@ -122,7 +110,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Default: Cache-first with network fallback
   event.respondWith(
     caches.match(event.request)
       .then(cached => cached || fetch(event.request))
@@ -130,7 +117,6 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ── Listen for skip-waiting message from client ──
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
