@@ -42,16 +42,16 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 /*
  * ╔═══════════════════════════════════════════════╗
  * ║  MON RELEVÉ — v2.0                            ║
- * ║  Compteur report · PDF simplifié · Nouveautés ║
+ * ║  Compteur report · PDF · Absences valorisées  ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.1";
+const VERSION = "2.0";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
 const MOTIFS_NEUTRES = ["Maladie","Sans solde","Autre"];
-function objJour(ct){return ct==="CDI — 39h"?468:420;} // compteur : 7h48 ou 7h
-function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // PDF : 8h ou 7h
+function objJour(ct){return ct==="CDI — 39h"?468:420;} // objectif journalier travaillé : 7h48 ou 7h
+function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // valorisation CP/Férié : 8h ou 7h (PDF + compteur)
 function calcReport(jours,contrat,cfg){
   const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvAbs=absAffJour(contrat);
   let travaille=0,valorise=0,neutre=0;
@@ -259,11 +259,10 @@ window.MonReleve=function MonReleve(){
 
   const{s:sem,l:lun}=semOff(off);
   const ck=cleS(sem),ven=new Date(lun.getTime()+4*MS_DAY),cur=off===0,ti=tIdx();
-  const objM=(H_OBJ[pr.contrat]||DEF_OBJ)*60;
   const isWeekend=ti<0&&cur;
 
   useEffect(()=>{if(ok&&pr.nom)setWd(ldSem(ck,pr.nom)||vide(sem));},[ck,pr.nom,ok,rk,sem.n,sem.y]);
-  // Recalcule le compteur au chargement (migration valorisation absences)
+  // Recalcule le compteur au chargement
   useEffect(()=>{if(ok&&pr.nom)recalcCounter(pr.nom);},[ok,pr.nom]);
 
   const sv=useCallback(d=>{setWd(d);svSem(ck,pr.nom,d);},[ck,pr.nom]);
@@ -295,7 +294,7 @@ window.MonReleve=function MonReleve(){
   const totMin=wd?wd.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0):0;
   const curReport=wd?calcReport(wd.jours,pr.contrat,pr):null;
   const hasD=wd&&wd.jours.some(j=>j.arrivee||j.depart||j.absence);
-  const pct=curReport?Math.min(100,Math.round(curReport.total/curReport.objAjuste*100)):0;
+  const pct=curReport&&curReport.objAjuste>0?Math.min(100,Math.round(curReport.total/curReport.objAjuste*100)):0;
   const prenom=(pr.nom||"").split(" ")[0]||pr.nom;
   const showQ=pr.pointageRapide!==false;
 
@@ -330,8 +329,6 @@ window.MonReleve=function MonReleve(){
   const mAbsTotal=stats.reduce((s,w)=>s+w.absCount,0);
   const mAbsDetail=useMemo(()=>{const agg={};stats.forEach(w=>{Object.entries(w.absMotifs).forEach(([m,c])=>{agg[m]=(agg[m]||0)+c;});});return Object.entries(agg).sort((a,b)=>b[1]-a[1]);},[stats]);
   const archList=useMemo(()=>allSem(pr.nom),[pr.nom,rk,ck,tab,wd]);
-
-  // ── Chart ──
 
   // ── PDF ──
   const Releve=({data,ck:ck2,l:l2,v:v2})=>{
@@ -369,7 +366,7 @@ window.MonReleve=function MonReleve(){
         {data.report.neutre>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
           <span style={{fontSize:10,color:pk.sub}}>Absences neutres (objectif ajusté)</span><span style={{fontSize:10,color:pk.muted}}>−{m2h(data.report.neutre)}</span>
         </div>}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px"}}>
           <span style={{fontSize:11,fontWeight:700,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorisePDF||data.report.valorise||0))}</span>
         </div>
         <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",marginTop:6}}>
@@ -662,7 +659,7 @@ window.MonReleve=function MonReleve(){
             </div>
             <div style={{marginTop:8,height:5,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>{mPct}%</span><span style={{fontSize:9,color:P.muted}}>{mDays}j ouvrés</span></div>
-            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count}j {motif}</div>))}</div>}
+            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count%1===0.5?(count-0.5)+"½":count}j {motif}</div>))}</div>}
             {detailMois&&stats.length>0&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${P.border}`}}>
               {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
                 return(<div key={i} style={{marginBottom:i<stats.length-1?6:0}}>
@@ -779,9 +776,8 @@ window.MonReleve=function MonReleve(){
                 <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
                   <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié<br/>
                   <span style={{fontSize:11}}>Journée : 8h (39h) / 7h (35h) · Demi-journée : 4h (39h) / 3h30 (35h)</span></div>
-                <div style={{marginBottom:6,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
-                  <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → aucun impact sur le compteur</div>
-                <div style={{marginBottom:12,fontSize:10,color:P.dim,fontStyle:"italic"}}>Les valeurs affichées sur le PDF sont les valorisations officielles (8h/4h). Le compteur utilise l'objectif journalier exact (7h48 pour 39h) pour garantir la neutralité.</div>
+                <div style={{marginBottom:12,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
+                  <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → réduisent l'objectif sans ajouter de crédit</div>
                 <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Compteur de report</div>
                 <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
                 <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul.</div>
@@ -803,15 +799,9 @@ window.MonReleve=function MonReleve(){
           {showChangelog&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
             <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%"}}>
               <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Nouveautés</div>
-              <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2.1</div>
-              <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:12}}>
-                {["Demi-journées d'absence","CP/Férié : valeur unique (8h/4h ou 7h/3h30)","Correction écart artificiel compteur","Statistiques mensuelles avec absences valorisées","Tableau de bord restructuré","Notice utilisateur complète"].map((item,i)=>(
-                  <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:P.teal}}>✓</span><span>{item}</span></div>
-                ))}
-              </div>
-              <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2.0</div>
+              <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2</div>
               <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:16}}>
-                {["Compteur de report automatique","Affichage du compteur dans le PDF","Gestion des absences valorisées et neutres","Verrouillage des relevés validés","Export PDF simplifié","Tableau de bord restructuré","Guide utilisateur complet"].map((item,i)=>(
+                {["Compteur de report automatique","Demi-journées d'absence","Valorisation unifiée CP/Férié (PDF et compteur)","Gestion des semaines à cheval","Absences valorisées et neutres","Verrouillage des relevés validés","Tableau de bord et statistiques mensuelles","Export PDF avec compteur de report","Sauvegarde et restauration JSON","Guide utilisateur complet"].map((item,i)=>(
                   <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:P.teal}}>✓</span><span>{item}</span></div>
                 ))}
               </div>
