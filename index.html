@@ -149,23 +149,33 @@ function mStats(n,ct,semNum,cfg){
   const results=[];
   allSem(n).forEach(({cle,data})=>{
     const lun=getLunCle(cle);const num=parseInt(cle.split("-S")[1]);
-    let daysIn=0,tot=0,absCount=0,neutreM=0;const absMotifs={};
+    let daysIn=0,absCount=0;const absMotifs={};
     data.jours.forEach((j,i)=>{
       const day=new Date(lun);day.setDate(day.getDate()+i);
       if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
       daysIn++;
-      if(j.absence){
-        const mult=j.demiJournee?0.5:1;
-        absCount+=mult;
-        const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
-        if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
-        if(MOTIFS_VALORISES.includes(j.motif)){tot+=Math.round(dvAbs*mult);}
-        else if(MOTIFS_NEUTRES.includes(j.motif)){neutreM+=Math.round(dv*mult);}
-      }
-      else{tot+=cNet(j.arrivee,j.depart,cfg);}
+      if(j.absence){const mult=j.demiJournee?0.5:1;absCount+=mult;const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;}
     });
     if(daysIn===0)return;
-    const obj=Math.round(daysIn*dailyObj)-neutreM;
+    let tot,obj;
+    if(data.valide&&data.report&&daysIn<5){
+      const ratio=daysIn/5;
+      tot=Math.round(data.report.total*ratio);
+      obj=Math.round(data.report.objAjuste*ratio);
+    }else{
+      tot=0;let neutreM=0;
+      data.jours.forEach((j,i)=>{
+        const day=new Date(lun);day.setDate(day.getDate()+i);
+        if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
+        if(j.absence){
+          const mult=j.demiJournee?0.5:1;
+          if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
+          if(MOTIFS_VALORISES.includes(j.motif)){tot+=Math.round(dvAbs*mult);}
+          else if(MOTIFS_NEUTRES.includes(j.motif)){neutreM+=Math.round(dv*mult);}
+        }else{tot+=cNet(j.arrivee,j.depart,cfg);}
+      });
+      obj=Math.round(daysIn*dailyObj)-neutreM;
+    }
     results.push({num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
   });
   return results.sort((a,b)=>a.num-b.num);
@@ -659,7 +669,7 @@ window.MonReleve=function MonReleve(){
             </div>
             <div style={{marginTop:8,height:5,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>{mPct}%</span><span style={{fontSize:9,color:P.muted}}>{mDays}j ouvrés</span></div>
-            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count%1===0.5?(count-0.5)+"½":count}j {motif}</div>))}</div>}
+            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count%1===0.5?(count===0.5?"½":(count-0.5)+"½"):count}j {motif}</div>))}</div>}
             {detailMois&&stats.length>0&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${P.border}`}}>
               {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
                 return(<div key={i} style={{marginBottom:i<stats.length-1?6:0}}>
