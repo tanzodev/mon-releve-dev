@@ -390,7 +390,7 @@ window.MonReleve=function MonReleve(){
         <div style={{borderTop:`1px solid #DBEAFE`,marginTop:4,paddingTop:5}}>
           <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{fontSize:9,color:pk.muted}}>Compteur précédent</span><span style={{fontSize:9,color:pk.muted}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span></div>
           <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{fontSize:9,color:pk.muted}}>Report appliqué</span><span style={{fontSize:9,color:pk.muted}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",borderTop:`2px solid #1E40AF`,marginTop:4,background:"#EFF6FF",margin:"4px -14px 0",padding:"8px 14px",borderRadius:"0 0 6px 6px"}}><span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>Compteur actuel</span><span style={{fontSize:15,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:`2px solid #1E40AF`,marginTop:4,background:"#EFF6FF",margin:"4px -14px 0",padding:"8px 14px",borderRadius:"0 0 6px 6px"}}><span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>Compteur actuel</span><span style={{fontSize:15,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
         </div>
       </div>}
       {data.valideA&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
@@ -666,8 +666,7 @@ window.MonReleve=function MonReleve(){
               <span style={{fontSize:12,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
               {stats.length>0&&<div style={{fontSize:15,fontWeight:800,color:mDiff>0?P.teal:mDiff<0?P.orange:P.teal}}>{mDiff>0?`+${m2h(mDiff)}`:mDiff<0?`−${m2h(Math.abs(mDiff))}`:"À jour"}</div>}
             </div>
-            {stats.length>0&&mDiff!==0&&<div style={{fontSize:10,color:mDiff>0?P.teal:P.orange,marginBottom:8,fontWeight:500}}>{mDiff>0?"d'avance":"restantes"}</div>}
-            {stats.length>0&&mDiff===0&&<div style={{marginBottom:8}}/>}
+            {stats.length>0&&<div style={{fontSize:10,color:mDiff>0?P.teal:mDiff<0?P.orange:P.teal,marginBottom:8,fontWeight:500}}>{mDiff>0?"d'avance":mDiff<0?"restantes":""}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
               <div style={{fontSize:14,fontWeight:600,color:P.sub}}>{m2h(mTot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
               {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,padding:"4px 0"}}>Détail {detailMois?"▴":"›"}</button>}
