@@ -160,8 +160,9 @@ function mStats(n,ct,semNum,cfg){
     let tot,obj;
     if(data.valide&&data.report&&daysIn<5){
       const ratio=daysIn/5;
-      tot=Math.round(data.report.total*ratio);
-      obj=Math.round(data.report.objAjuste*ratio);
+      const weekTotal=(data.report.travaille||0)+(data.report.valorise||0);
+      tot=Math.round(weekTotal*ratio);
+      obj=Math.round((data.report.objAjuste||0)*ratio);
     }else{
       tot=0;let neutreM=0;
       data.jours.forEach((j,i)=>{
@@ -264,6 +265,7 @@ window.MonReleve=function MonReleve(){
   const[detailMois,setDetailMois]=useState(false);
   const[relOpen,setRelOpen]=useState(false);
   const[aideOpen,setAideOpen]=useState(false);
+  const[privOpen,setPrivOpen]=useState(false);
   const[savOpen,setSavOpen]=useState(false);
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
 
@@ -737,8 +739,11 @@ window.MonReleve=function MonReleve(){
               <button onClick={()=>setGuideOpen(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`,WebkitTapHighlightColor:"transparent"}}>
                 <span style={{fontSize:13,color:P.text}}>Guide utilisateur</span><span style={{color:P.dim}}>›</span>
               </button>
-              <button onClick={()=>setShowChangelog(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",WebkitTapHighlightColor:"transparent"}}>
+              <button onClick={()=>setShowChangelog(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`,WebkitTapHighlightColor:"transparent"}}>
                 <span style={{fontSize:13,color:P.text}}>Nouveautés de la version</span><span style={{color:P.dim}}>›</span>
+              </button>
+              <button onClick={()=>setPrivOpen(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",WebkitTapHighlightColor:"transparent"}}>
+                <span style={{fontSize:13,color:P.text}}>Confidentialité & données</span><span style={{color:P.dim}}>›</span>
               </button>
             </div>}
           </div>
@@ -816,6 +821,37 @@ window.MonReleve=function MonReleve(){
                 ))}
               </div>
               <button onClick={()=>setShowChangelog(false)} style={{...st.sec,width:"100%"}}>Fermer</button>
+            </div>
+          </div>}
+
+          {/* Confidentialité (overlay) */}
+          {privOpen&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+            <div style={{...GL,borderRadius:28,padding:24,maxWidth:380,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
+              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:4}}>Confidentialité & données</div>
+              <div style={{fontSize:11,color:P.muted,marginBottom:16}}>Mon Relevé v{VERSION}</div>
+              <div style={{fontSize:12,color:P.sub,lineHeight:1.7}}>
+                <div style={{fontWeight:700,color:P.teal,fontSize:13,marginBottom:6}}>Responsable du traitement</div>
+                <div style={{marginBottom:12}}>{pr.entreprise||"Votre entreprise"}, dans le cadre du suivi du temps de travail prévu par l'article L.3171-2 du Code du travail.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Données collectées</div>
+                <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
+                  Nom, prénom, type de contrat, horaires d'arrivée et de départ, motifs d'absence (congé payé, férié, maladie, sans solde, autre), notes de semaine.</div>
+                <div style={{marginBottom:12}}>Ces données sont strictement nécessaires à l'établissement du relevé d'heures hebdomadaire.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Stockage</div>
+                <div style={{marginBottom:4}}>Toutes vos données sont stockées exclusivement sur votre appareil (localStorage du navigateur). Aucune donnée n'est transmise à un serveur distant.</div>
+                <div style={{marginBottom:12,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)",fontSize:11}}>
+                  <strong>Concrètement :</strong> aucun compte utilisateur, aucune base de données en ligne, aucun cookie de suivi, aucune collecte analytique.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Transmission</div>
+                <div style={{marginBottom:12}}>Le relevé PDF est généré localement et partagé manuellement par le salarié à la direction, conformément à l'obligation de contrôle de la durée du travail.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Données de santé</div>
+                <div style={{marginBottom:12}}>Le motif "Maladie" constitue une donnée de santé au sens de l'article 9 du RGPD. Son traitement est justifié par l'obligation légale de suivi du temps de travail. Seul le motif générique est enregistré, sans indication sur la nature de la pathologie.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Connexions réseau</div>
+                <div style={{marginBottom:12}}>Au chargement initial, l'application contacte GitHub Pages (hébergement) et unpkg.com (bibliothèques techniques). Ces services peuvent enregistrer votre adresse IP. Une fois en cache, l'application fonctionne hors ligne.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Vos droits</div>
+                <div style={{marginBottom:12}}>Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Vos données étant stockées sur votre appareil, vous pouvez les consulter (export JSON), les modifier ou les supprimer à tout moment directement depuis l'application.</div>
+                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Durée de conservation</div>
+                <div style={{marginBottom:4}}>Les données sont conservées sur votre appareil tant que vous ne les supprimez pas. Il est recommandé de conserver les relevés au minimum 3 ans (prescription légale en matière de durée du travail, art. L.3245-1 du Code du travail).</div>
+              </div>
+              <button onClick={()=>setPrivOpen(false)} style={{...st.sec,width:"100%",marginTop:16}}>Fermer</button>
             </div>
           </div>}
         </>)}

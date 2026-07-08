@@ -4,7 +4,7 @@
  */
 
 const APP_VERSION = '2.1';
-const CACHE_CORE = 'mr-core-v2.1.6';
+const CACHE_CORE = 'mr-core-v2.1.7';
 const CACHE_CDN = 'mr-cdn-v1';
 
 // Core assets (versioned — cleared on update)
