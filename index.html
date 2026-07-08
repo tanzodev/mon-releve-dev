@@ -260,11 +260,11 @@ window.MonReleve=function MonReleve(){
   const[rk,setRk]=useState(0);
   const[peOpen,setPeOpen]=useState(false);
   const[notesOpen,setNotesOpen]=useState(false);
-  const[showChangelog,setShowChangelog]=useState(false);
-  const[guideOpen,setGuideOpen]=useState(false);
   const[detailMois,setDetailMois]=useState(false);
   const[relOpen,setRelOpen]=useState(false);
   const[aideOpen,setAideOpen]=useState(false);
+  const[aideSec,setAideSec]=useState({});
+  const toggleAide=id=>setAideSec(s=>({...s,[id]:!s[id]}));
   const[privOpen,setPrivOpen]=useState(false);
   const[savOpen,setSavOpen]=useState(false);
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
@@ -378,19 +378,19 @@ window.MonReleve=function MonReleve(){
         {data.report.neutre>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
           <span style={{fontSize:10,color:pk.sub}}>Absences neutres (objectif ajusté)</span><span style={{fontSize:10,color:pk.muted}}>−{m2h(data.report.neutre)}</span>
         </div>}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px"}}>
-          <span style={{fontSize:11,fontWeight:700,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorisePDF||data.report.valorise||0))}</span>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"12px 14px"}}>
+          <span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:18,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorisePDF||data.report.valorise||0))}</span>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",marginTop:6}}>
-          <span style={{fontSize:10,color:pk.sub}}>Objectif{data.report.neutre>0?" ajusté":""}</span><span>{m2h(data.report.objAjuste||(H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
+        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",marginTop:5}}>
+          <span style={{fontSize:9,color:pk.muted}}>Objectif{data.report.neutre>0?" ajusté":""}</span><span style={{fontSize:9,color:pk.muted}}>{m2h(data.report.objAjuste||(H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}>
-          <span style={{fontSize:10,color:pk.sub}}>Écart semaine</span><span style={{color:data.report.ecart>=0?"#059669":"#DC2626",fontWeight:600}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
+        <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+          <span style={{fontSize:9,color:pk.muted}}>Écart semaine</span><span style={{fontSize:9,color:data.report.ecart>=0?"#059669":"#DC2626",fontWeight:600}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
         </div>
-        <div style={{borderTop:`1px solid #DBEAFE`,marginTop:4,paddingTop:6}}>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:10,color:pk.sub}}>Compteur précédent</span><span>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:10,color:pk.sub}}>Report appliqué</span><span style={{fontWeight:600}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderTop:`1px solid #DBEAFE`,marginTop:4}}><span style={{fontSize:11,fontWeight:700}}>Compteur actuel</span><span style={{fontSize:13,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
+        <div style={{borderTop:`1px solid #DBEAFE`,marginTop:4,paddingTop:5}}>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{fontSize:9,color:pk.muted}}>Compteur précédent</span><span style={{fontSize:9,color:pk.muted}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{fontSize:9,color:pk.muted}}>Report appliqué</span><span style={{fontSize:9,color:pk.muted}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:`2px solid #1E40AF`,marginTop:4,background:"#EFF6FF",margin:"4px -14px 0",padding:"8px 14px",borderRadius:"0 0 6px 6px"}}><span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>Compteur actuel</span><span style={{fontSize:15,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
         </div>
       </div>}
       {data.valideA&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
@@ -513,24 +513,24 @@ window.MonReleve=function MonReleve(){
         <div style={{...GL,borderRadius:24,padding:"18px 20px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
             <div>
-              <div style={{fontSize:10,color:P.sub,fontWeight:500,textTransform:"uppercase",letterSpacing:.5}}>Temps travaillé</div>
-              <div style={{fontSize:34,fontWeight:800,color:P.text,letterSpacing:-2,marginTop:2}}>{m2h(totMin)}</div>
+              <div style={{fontSize:9,color:P.muted,fontWeight:500,textTransform:"uppercase",letterSpacing:.5}}>Temps travaillé</div>
+              <div style={{fontSize:38,fontWeight:800,color:P.text,letterSpacing:-2,marginTop:1}}>{m2h(totMin)}</div>
             </div>
-            <div style={{textAlign:"right",marginBottom:4}}>
-              <div style={{fontSize:13,color:P.muted}}>sur {H_OBJ[pr.contrat]||DEF_OBJ}h</div>
-              <div style={{fontSize:11,color:P.sub}}>prévues</div>
+            <div style={{textAlign:"right",marginBottom:6}}>
+              <div style={{fontSize:12,color:P.dim}}>sur {H_OBJ[pr.contrat]||DEF_OBJ}h prévues</div>
             </div>
           </div>
           <div style={{marginTop:8,height:5,borderRadius:3,background:P.card,overflow:"hidden"}}>
             <div style={{height:"100%",borderRadius:3,background:pct>=100?P.teal:P.blue,width:`${pct}%`,transition:"width .4s"}}/>
           </div>
-          <div style={{marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              {isWeekend&&weekStatus?(<><div style={{width:7,height:7,borderRadius:4,background:wd.valide?P.teal:P.blue}}/><span style={{fontSize:11,fontWeight:600,color:wd.valide?P.teal:P.blue}}>{weekStatus}</span></>)
-              :wd.valide?(<><div style={{width:7,height:7,borderRadius:4,background:P.teal}}/><span style={{fontSize:11,fontWeight:600,color:P.teal}}>Envoyé</span></>)
-              :(<><div style={{width:7,height:7,borderRadius:4,background:P.orange}}/><span style={{fontSize:11,fontWeight:600,color:P.orange}}>Non envoyé</span></>)}
+          <div style={{marginTop:5,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              {isWeekend&&weekStatus?(<><div style={{width:6,height:6,borderRadius:3,background:wd.valide?P.teal:P.blue}}/><span style={{fontSize:10,fontWeight:600,color:wd.valide?P.teal:P.blue}}>{weekStatus}</span></>)
+              :wd.valide?(<><div style={{width:6,height:6,borderRadius:3,background:P.teal}}/><span style={{fontSize:10,fontWeight:600,color:P.teal}}>Envoyé</span></>)
+              :(<><div style={{width:6,height:6,borderRadius:3,background:P.orange}}/><span style={{fontSize:10,fontWeight:600,color:P.orange}}>Non envoyé</span></>)}
             </div>
-            {(()=>{const jc=wd.jours.filter(j=>!j.absence&&(j.arrivee||j.depart)).length;return<span style={{fontSize:10,color:P.muted}}>{jc} jour{jc>1?"s":""} saisis</span>;})()}
+            {(()=>{const jc=wd.jours.filter(j=>!j.absence&&(j.arrivee||j.depart)).length;return<span style={{fontSize:9,color:P.dim}}>{jc} jour{jc>1?"s":""} saisis</span>;})()}
+          </div>
           </div>
         </div>
       </div>
@@ -650,6 +650,7 @@ window.MonReleve=function MonReleve(){
                 </div>
                 <div style={{fontSize:22,fontWeight:800,color:cnt>0?P.teal:cnt<0?P.orange:P.text}}>{cnt>0?"+":cnt<0?"−":""}{m2h(Math.abs(cnt))}</div>
               </div>
+              <div style={{textAlign:"right",marginTop:2}}><span style={{fontSize:10,color:cnt>0?P.teal:cnt<0?P.orange:P.dim}}>{cnt>0?"En avance":cnt<0?"À récupérer":"Équilibré"}</span></div>
               <div style={{marginTop:6,height:4,borderRadius:2,background:P.card,overflow:"hidden",position:"relative"}}>
                 <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:1,background:P.dim}}/>
                 {cnt!==0&&<div style={{height:"100%",borderRadius:2,background:cnt>0?P.teal:P.orange,width:`${Math.min(50,Math.abs(cnt)/REPORT_GLOBAL_CAP*50)}%`,marginLeft:cnt>=0?"50%":"auto",marginRight:cnt<0?"50%":"auto",transition:"width .4s"}}/>}
@@ -661,25 +662,26 @@ window.MonReleve=function MonReleve(){
 
           {/* Mois en cours (toujours visible) */}
           <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
               <span style={{fontSize:12,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
+              {stats.length>0&&<div style={{fontSize:15,fontWeight:800,color:mDiff>0?P.teal:mDiff<0?P.orange:P.teal}}>{mDiff>0?`+${m2h(mDiff)}`:mDiff<0?`−${m2h(Math.abs(mDiff))}`:"À jour"}</div>}
+            </div>
+            {stats.length>0&&<div style={{fontSize:10,color:mDiff>0?P.teal:mDiff<0?P.orange:P.teal,marginBottom:8,fontWeight:500}}>{mDiff>0?"d'avance":mDiff<0?"restantes":"—"}</div>}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+              <div style={{fontSize:14,fontWeight:600,color:P.sub}}>{m2h(mTot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
               {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,padding:"4px 0"}}>Détail {detailMois?"▴":"›"}</button>}
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-              <div style={{fontSize:24,fontWeight:800,color:P.text}}>{m2h(mTot)} <span style={{fontSize:14,fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
-              {stats.length>0&&<div style={{fontSize:12,fontWeight:600,color:mDiff>0?P.teal:mDiff<0?P.orange:P.blue}}>{mDiff>0?`+${m2h(mDiff)} d'avance`:mDiff<0?`${m2h(Math.abs(mDiff))} restantes`:"À jour"}</div>}
-            </div>
-            <div style={{marginTop:8,height:5,borderRadius:3,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.muted}}>{mPct}%</span><span style={{fontSize:9,color:P.muted}}>{mDays}j ouvrés</span></div>
-            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:10,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 8px",borderRadius:999}}>{count%1===0.5?(count===0.5?"½":(count-0.5)+"½"):count}j {motif}</div>))}</div>}
-            {detailMois&&stats.length>0&&<div style={{marginTop:10,paddingTop:8,borderTop:`1px solid ${P.border}`}}>
+            <div style={{marginTop:6,height:4,borderRadius:2,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.dim}}>{mPct}%</span><span style={{fontSize:9,color:P.dim}}>{mDays}j ouvrés</span></div>
+            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:9,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 7px",borderRadius:999}}>{count%1===0.5?(count===0.5?"½":(count-0.5)+"½"):count}j {motif}</div>))}</div>}
+            {detailMois&&stats.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${P.border}`}}>
               {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
-                return(<div key={i} style={{marginBottom:i<stats.length-1?6:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
-                    <div style={{display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:10,fontWeight:700,color:P.text}}>S{w.num}</span>{w.daysIn&&w.daysIn<5&&<span style={{fontSize:8,color:P.muted}}>({w.daysIn}j)</span>}{w.v&&<ICheck size={9}/>}</div>
-                    <span style={{fontSize:10,fontWeight:600,color:col}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(w.obj)}</span></span>
+                return(<div key={i} style={{marginBottom:i<stats.length-1?5:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:9,fontWeight:700,color:P.sub}}>S{w.num}</span>{w.daysIn&&w.daysIn<5&&<span style={{fontSize:8,color:P.dim}}>({w.daysIn}j)</span>}{w.v&&<ICheck size={8}/>}</div>
+                    <span style={{fontSize:9,fontWeight:600,color:P.muted}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.dim}}>/ {m2h(w.obj)}</span></span>
                   </div>
-                  <div style={{height:3,borderRadius:2,background:P.card,overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:col,width:`${pc}%`,transition:"width .4s"}}/></div>
+                  <div style={{height:2,borderRadius:1,background:P.card,overflow:"hidden"}}><div style={{height:"100%",borderRadius:1,background:col,width:`${pc}%`,transition:"width .4s"}}/></div>
                 </div>);
               })}
             </div>}
@@ -726,7 +728,7 @@ window.MonReleve=function MonReleve(){
             </div>}
           </div>
 
-          {/* Aide & Notice (accordéon fermé) */}
+          {/* Aide & Notice (sections repliables indépendantes) */}
           <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
             <button onClick={()=>setAideOpen(!aideOpen)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0,WebkitTapHighlightColor:"transparent"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -735,16 +737,54 @@ window.MonReleve=function MonReleve(){
               </div>
               <span style={{color:P.sub,fontSize:14,transform:aideOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
             </button>
-            {aideOpen&&<div style={{marginTop:12}}>
-              <button onClick={()=>setGuideOpen(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`,WebkitTapHighlightColor:"transparent"}}>
-                <span style={{fontSize:13,color:P.text}}>Guide utilisateur</span><span style={{color:P.dim}}>›</span>
-              </button>
-              <button onClick={()=>setShowChangelog(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${P.border}`,WebkitTapHighlightColor:"transparent"}}>
-                <span style={{fontSize:13,color:P.text}}>Nouveautés de la version</span><span style={{color:P.dim}}>›</span>
-              </button>
-              <button onClick={()=>setPrivOpen(true)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",WebkitTapHighlightColor:"transparent"}}>
-                <span style={{fontSize:13,color:P.text}}>Confidentialité & données</span><span style={{color:P.dim}}>›</span>
-              </button>
+            {aideOpen&&<div style={{marginTop:10}}>
+              {[
+                {id:"usage",t:"Utilisation",c:<>
+                  <div style={{marginBottom:4}}>Chaque jour, saisissez votre heure d'arrivée et de départ. Tapez les chiffres directement (ex: 830 → 08:30, 1730 → 17:30).</div>
+                  <div style={{marginBottom:4}}>Le pointage rapide permet d'enregistrer l'heure exacte en un tap (boutons ↓ et ↑). Les pauses sont déduites automatiquement.</div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Validation</div>
+                  <div style={{marginBottom:4}}>En fin de semaine, vérifiez vos heures puis tapez "Valider et envoyer".</div>
+                  <div style={{color:P.orange,fontWeight:600}}>Seul le relevé validé et transmis à l'employeur fait foi.</div>
+                </>},
+                {id:"abs",t:"Absences",c:<>
+                  <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif. Choisir entre journée complète ou demi-journée.</div>
+                  <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
+                    <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié<br/>
+                    <span style={{fontSize:11}}>Journée : 8h (39h) / 7h (35h) · Demi-journée : 4h (39h) / 3h30 (35h)</span></div>
+                  <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
+                    <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → réduisent l'objectif sans ajouter de crédit</div>
+                </>},
+                {id:"cpt",t:"Compteur de report",c:<>
+                  <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
+                  <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul.</div>
+                  <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)",fontSize:11}}>
+                    <strong>Exemple :</strong> Semaine à 41h sur contrat 39h → écart +2h → compteur passe de 0 à +2h.</div>
+                  <div>Le compteur est recalculé automatiquement en cas de modification ou suppression d'un relevé.</div>
+                </>},
+                {id:"sav",t:"Sauvegarde & PDF",c:<>
+                  <div style={{marginBottom:4}}>Effectuez une sauvegarde au minimum 1 fois par mois depuis le tableau de bord. Conservez le fichier dans iCloud Drive (iPhone) ou Google Drive (Android).</div>
+                  <div style={{marginBottom:4}}>Le PDF contient : heures travaillées, absences valorisées, total comptabilisé, objectif ajusté, et le compteur de report.</div>
+                  <div>Les statistiques mensuelles répartissent automatiquement les jours des semaines à cheval dans le mois concerné.</div>
+                </>},
+                {id:"priv",t:"Confidentialité",c:<>
+                  <div style={{marginBottom:4}}>Vos données sont stockées exclusivement sur votre appareil. Aucune donnée n'est transmise à un serveur distant. Aucun compte utilisateur, aucun cookie, aucune collecte analytique.</div>
+                  <div style={{marginBottom:4}}>Le motif "Maladie" (donnée de santé, art. 9 RGPD) est traité sur base légale (obligation de suivi du temps de travail). Seul le motif générique est enregistré.</div>
+                  <div><button onClick={()=>setPrivOpen(true)} style={{background:"none",border:"none",color:P.teal,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Voir la notice complète ›</button></div>
+                </>},
+                {id:"new",t:"Nouveautés V2",c:<>
+                  {["Compteur de report automatique","Demi-journées d'absence","Valorisation unifiée CP/Férié (PDF et compteur)","Gestion des semaines à cheval","Absences valorisées et neutres","Verrouillage des relevés validés","Tableau de bord et statistiques mensuelles","Export PDF avec compteur de report","Sauvegarde et restauration JSON"].map((item,i)=>(
+                    <div key={i} style={{display:"flex",gap:6,alignItems:"center",lineHeight:1.6}}><span style={{color:P.teal,flexShrink:0}}>✓</span><span>{item}</span></div>
+                  ))}
+                </>}
+              ].map(s=>(
+                <div key={s.id} style={{borderBottom:`1px solid ${P.border}`}}>
+                  <button onClick={()=>toggleAide(s.id)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",WebkitTapHighlightColor:"transparent"}}>
+                    <span style={{fontSize:12,fontWeight:600,color:aideSec[s.id]?P.teal:P.sub}}>{s.t}</span>
+                    <span style={{color:P.dim,fontSize:11,transform:aideSec[s.id]?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+                  </button>
+                  {aideSec[s.id]&&<div style={{fontSize:11,color:P.sub,lineHeight:1.7,paddingBottom:10}}>{s.c}</div>}
+                </div>
+              ))}
             </div>}
           </div>
 
@@ -771,58 +811,7 @@ window.MonReleve=function MonReleve(){
             </div>}
           </div>
 
-          {/* Guide utilisateur (overlay) */}
-          {guideOpen&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
-            <div style={{...GL,borderRadius:28,padding:24,maxWidth:380,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
-              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:4}}>Guide d'utilisation</div>
-              <div style={{fontSize:11,color:P.muted,marginBottom:16}}>Mon Relevé v{VERSION}</div>
-              <div style={{fontSize:12,color:P.sub,lineHeight:1.7}}>
-                <div style={{fontWeight:700,color:P.teal,fontSize:13,marginBottom:6}}>Présentation</div>
-                <div style={{marginBottom:12}}>Mon Relevé est votre outil de suivi d'heures hebdomadaire. Il calcule automatiquement vos heures travaillées, gère les absences et le compteur de report d'heures.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Saisie des heures</div>
-                <div style={{marginBottom:4}}>Chaque jour, saisissez votre heure d'arrivée et de départ. Tapez les chiffres directement (ex: 830 → 08:30, 1730 → 17:30).</div>
-                <div style={{marginBottom:4}}>Le pointage rapide permet d'enregistrer l'heure exacte en un tap (boutons ↓ et ↑).</div>
-                <div style={{marginBottom:12}}>Les pauses (10:00-10:15 et 12:30-13:15) sont déduites automatiquement.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Validation</div>
-                <div style={{marginBottom:4}}>En fin de semaine, vérifiez vos heures puis tapez "Valider et envoyer".</div>
-                <div style={{marginBottom:12,color:P.orange,fontWeight:600}}>Seul le relevé validé et transmis à l'employeur fait foi. Toute modification après envoi ne sera pas prise en compte.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Absences</div>
-                <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif. Choisir entre journée complète ou demi-journée.</div>
-                <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
-                  <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié<br/>
-                  <span style={{fontSize:11}}>Journée : 8h (39h) / 7h (35h) · Demi-journée : 4h (39h) / 3h30 (35h)</span></div>
-                <div style={{marginBottom:12,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
-                  <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → réduisent l'objectif sans ajouter de crédit</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Compteur de report</div>
-                <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
-                <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul.</div>
-                <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)",fontSize:11}}>
-                  <strong>Exemple :</strong> Semaine à 41h sur contrat 39h → écart +2h → compteur passe de 0 à +2h.</div>
-                <div style={{marginBottom:12}}>Le compteur est recalculé automatiquement en cas de modification ou suppression d'un relevé.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Relevé PDF</div>
-                <div style={{marginBottom:12}}>Le PDF contient : heures travaillées, absences valorisées, total comptabilisé, objectif ajusté, et le détail du compteur de report.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Semaines à cheval</div>
-                <div style={{marginBottom:12}}>Le relevé reste hebdomadaire. Les statistiques mensuelles répartissent automatiquement les jours dans le mois concerné.</div>
-                <div style={{fontWeight:700,color:P.text,marginBottom:4}}>Sauvegarde</div>
-                <div>Effectuez une sauvegarde au minimum 1 fois par mois depuis le tableau de bord. Conservez le fichier dans iCloud Drive (iPhone) ou Google Drive (Android). En cas de changement de téléphone, restaurez depuis l'écran d'accueil.</div>
-              </div>
-              <button onClick={()=>setGuideOpen(false)} style={{...st.sec,width:"100%",marginTop:16}}>Fermer</button>
-            </div>
-          </div>}
-
-          {/* Nouveautés de la version (overlay) */}
-          {showChangelog&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
-            <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%"}}>
-              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:16}}>Nouveautés</div>
-              <div style={{fontWeight:700,color:P.teal,marginBottom:8}}>V2</div>
-              <div style={{fontSize:12,color:P.sub,lineHeight:1.8,marginBottom:16}}>
-                {["Compteur de report automatique","Demi-journées d'absence","Valorisation unifiée CP/Férié (PDF et compteur)","Gestion des semaines à cheval","Absences valorisées et neutres","Verrouillage des relevés validés","Tableau de bord et statistiques mensuelles","Export PDF avec compteur de report","Sauvegarde et restauration JSON","Guide utilisateur complet"].map((item,i)=>(
-                  <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}><span style={{color:P.teal}}>✓</span><span>{item}</span></div>
-                ))}
-              </div>
-              <button onClick={()=>setShowChangelog(false)} style={{...st.sec,width:"100%"}}>Fermer</button>
-            </div>
-          </div>}
+          {/* Nouveautés — supprimé, intégré dans Aide */}
 
           {/* Confidentialité (overlay) */}
           {privOpen&&<div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
@@ -904,7 +893,7 @@ const st={
   chip:{padding:"5px 12px",borderRadius:999,border:`1px solid ${P.border}`,background:"rgba(255,255,255,.04)",color:P.sub,fontSize:12,fontWeight:500,cursor:"pointer",transition:TR},
   punchBtn:{width:28,height:28,borderRadius:14,...GL,border:`1.5px solid ${P.teal}40`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:P.teal,padding:0,transition:TR},
   mP:{padding:"8px 14px",borderRadius:999,border:"none",background:"rgba(255,255,255,.06)",color:P.text,fontSize:12,fontWeight:500,cursor:"pointer",textAlign:"center",transition:TR},
-  archI:{width:"100%",display:"flex",alignItems:"center",padding:"14px 18px",...GL,borderRadius:20,marginBottom:10,cursor:"pointer",textAlign:"left",transition:TR},
+  archI:{width:"100%",display:"flex",alignItems:"center",padding:"10px 14px",...GL,borderRadius:16,marginBottom:6,cursor:"pointer",textAlign:"left",transition:TR},
   cta:{padding:"0 28px",borderRadius:999,border:"none",background:`linear-gradient(135deg, ${P.sky}, ${P.teal})`,backgroundImage:`linear-gradient(180deg, rgba(255,255,255,.15), transparent), linear-gradient(135deg, ${P.sky}, ${P.teal})`,color:P.bg,fontSize:14,fontWeight:700,cursor:"pointer",textAlign:"center",height:48,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 24px rgba(45,212,168,.20)",letterSpacing:.3,transition:TR},
   sec:{padding:"12px 16px",borderRadius:16,border:`1px solid ${P.glassBorder}`,background:"rgba(255,255,255,.05)",color:P.text,fontSize:13,fontWeight:500,cursor:"pointer",textAlign:"center",transition:TR},
   fCTA:{position:"fixed",bottom:110,left:0,right:0,padding:"0 90px",zIndex:40,maxWidth:520,margin:"0 auto"},
