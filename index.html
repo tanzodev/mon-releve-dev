@@ -850,7 +850,10 @@ window.MonReleve=function MonReleve(){
         </>)}
       </div>
 
-      {tab==="heures"&&hasD&&!wd.valide&&<div style={st.fCTA}><button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button></div>}
+      {tab==="heures"&&hasD&&!wd.valide&&<div style={st.fCTA}>
+        {lun.getMonth()!==ven.getMonth()&&<button onClick={()=>{setPdfMois({m:lun.getMonth(),y:lun.getFullYear()});setPop(true);}} style={{...st.sec,width:"100%",marginBottom:8,fontSize:12}}>PDF clôture {MOIS[lun.getMonth()]}</button>}
+        <button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button>
+      </div>}
 
       {/* Tab bar with active green bg */}
       <div style={st.tabBar}>
