@@ -252,6 +252,7 @@ window.MonReleve=function MonReleve(){
   const toggleAide=id=>setAideSec(s=>({...s,[id]:!s[id]}));
   const[privOpen,setPrivOpen]=useState(false);
   const[savOpen,setSavOpen]=useState(false);
+  const[pdfMois,setPdfMois]=useState(null);
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
 
   const{s:sem,l:lun}=semOff(off);
@@ -328,31 +329,36 @@ window.MonReleve=function MonReleve(){
   const archList=useMemo(()=>allSem(pr.nom),[pr.nom,rk,ck,tab,wd]);
 
   // ── PDF ──
-  const Releve=({data,ck:ck2,l:l2,v:v2})=>{
+  const Releve=({data,ck:ck2,l:l2,v:v2,moisFilter})=>{
     let cu=0;const pk={bg:"#fff",text:"#111827",sub:"#6B7280",muted:"#9CA3AF",accent:"#0D7377",border:"#E5E7EB",orange:"#D97706"};
     const cell={padding:"8px 6px",borderBottom:`1px solid ${pk.border}`,borderRight:`1px solid ${pk.border}`,textAlign:"center",fontSize:10,color:pk.text};
     const cellL={...cell,textAlign:"left",fontWeight:600};const cellEnd={...cell,borderRight:"none"};
+    const isPartiel=moisFilter!=null;
+    const filteredDays=data.jours.map((j,i)=>{const d=new Date(l2);d.setDate(d.getDate()+i);return{j,i,d,inMonth:!isPartiel||(d.getMonth()===moisFilter.m&&d.getFullYear()===moisFilter.y)};});
+    const visibleDays=filteredDays.filter(x=>x.inMonth);
+    const moisLabel=isPartiel?MOIS[moisFilter.m]+" "+moisFilter.y:"";
     return(<div id="releve-pdf" style={{background:pk.bg,margin:16,borderRadius:20,padding:20,boxShadow:"0 4px 24px rgba(0,0,0,.2)",fontSize:12,lineHeight:1.6,overflowX:"auto",color:pk.text}}>
       <div style={{display:"flex",justifyContent:"space-between",paddingBottom:14,borderBottom:`2px solid ${pk.text}`,marginBottom:12}}>
-        <div><div style={{fontSize:15,fontWeight:700,color:pk.text}}>{pr.entreprise}</div><div style={{fontSize:10,color:pk.sub,marginTop:2}}>Relevé d'heures hebdomadaire</div></div>
-        <div style={{textAlign:"right"}}><div style={{fontSize:12,fontWeight:600,color:pk.text}}>{pr.nom}</div><div style={{fontSize:10,color:pk.accent,fontWeight:600,marginTop:2}}>{pr.contrat}</div><div style={{fontSize:11,fontWeight:700,marginTop:4,color:pk.text}}>Semaine {parseInt(ck2.split("-S")[1])}</div><div style={{fontSize:9,color:pk.sub}}>{fF(l2)} — {fF(v2)}</div></div>
+        <div><div style={{fontSize:15,fontWeight:700,color:pk.text}}>{pr.entreprise}</div><div style={{fontSize:10,color:pk.sub,marginTop:2}}>Relevé d'heures {isPartiel?"— Clôture "+moisLabel:"hebdomadaire"}</div></div>
+        <div style={{textAlign:"right"}}><div style={{fontSize:12,fontWeight:600,color:pk.text}}>{pr.nom}</div><div style={{fontSize:10,color:pk.accent,fontWeight:600,marginTop:2}}>{pr.contrat}</div><div style={{fontSize:11,fontWeight:700,marginTop:4,color:pk.text}}>Semaine {parseInt(ck2.split("-S")[1])}{isPartiel?` (${visibleDays.length}j — ${moisLabel})`:""}</div><div style={{fontSize:9,color:pk.sub}}>{fF(l2)} — {fF(v2)}</div></div>
       </div>
       <table style={{width:"100%",borderCollapse:"collapse",marginTop:6,fontSize:10,border:`1px solid ${pk.border}`}}>
         <colgroup><col style={{width:"16%"}}/><col style={{width:"22%"}}/><col style={{width:"14%"}}/><col style={{width:"14%"}}/><col style={{width:"14%"}}/><col style={{width:"20%"}}/></colgroup>
         <thead><tr>{["Jour","Date","Arrivée","Départ","Pause","Net"].map((h,i)=><th key={h} style={{padding:"7px 4px",fontSize:8,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,textAlign:i===0?"left":"center",color:pk.sub,borderBottom:`2px solid ${pk.text}`,borderRight:i<5?`1px solid ${pk.border}`:"none",background:"#F9FAFB"}}>{h}</th>)}</tr></thead>
         <tbody>
-          {data.jours.map((j,i)=>{const d=new Date(l2);d.setDate(d.getDate()+i);
+          {filteredDays.map(({j,i,d,inMonth})=>{
+            if(!inMonth)return null;
             if(j.absence&&!j.demiJournee){const mt=j.motif==="Autre"?(j.motifAutre||"Autre"):j.motif;return(<tr key={i} style={{background:"#FFF8F0"}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td colSpan={3} style={{...cell,color:pk.orange,fontWeight:500}}>{mt}</td><td style={{...cellEnd,color:pk.text}}>—</td></tr>);}
             if(j.absence&&j.demiJournee){const mt=j.motif==="Autre"?(j.motifAutre||"Autre"):j.motif;const n=cNet(j.arrivee,j.depart,pr);cu+=n;return(<tr key={i} style={{background:"#FFF8F0"}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td style={cell}>{j.arrivee||"—"}</td><td style={cell}>{j.depart||"—"}</td><td style={{...cell,color:pk.orange,fontSize:9}}>½ {mt}</td><td style={{...cellEnd,fontWeight:700}}>{j.arrivee&&j.depart?m2h(n):"—"}</td></tr>);}
             const n=cNet(j.arrivee,j.depart,pr);cu+=n;
             return(<tr key={i} style={i%2?{background:"#FAFBFC"}:{}}><td style={cellL}>{JOURS[i]}</td><td style={cell}>{fF(d)}</td><td style={cell}>{j.arrivee||"—"}</td><td style={cell}>{j.depart||"—"}</td><td style={cell}>{j.arrivee&&j.depart?m2h(cPause(j.arrivee,j.depart,pr)):"—"}</td><td style={{...cellEnd,fontWeight:700}}>{j.arrivee&&j.depart?m2h(n):"—"}</td></tr>);
           })}
-          <tr style={{background:"#F9FAFB"}}><td colSpan={5} style={{padding:"8px 6px",textAlign:"right",fontWeight:700,borderTop:`2px solid ${pk.text}`,borderBottom:"none",borderRight:`1px solid ${pk.border}`,color:pk.text}}>TOTAL</td><td style={{padding:"8px 6px",fontWeight:800,fontSize:14,borderTop:`2px solid ${pk.text}`,borderBottom:"none",color:pk.text}}>{m2h(cu)}</td></tr>
+          <tr style={{background:"#F9FAFB"}}><td colSpan={5} style={{padding:"8px 6px",textAlign:"right",fontWeight:700,borderTop:`2px solid ${pk.text}`,borderBottom:"none",borderRight:`1px solid ${pk.border}`,color:pk.text}}>TOTAL{isPartiel?` (${moisLabel})`:""}</td><td style={{padding:"8px 6px",fontWeight:800,fontSize:14,borderTop:`2px solid ${pk.text}`,borderBottom:"none",color:pk.text}}>{m2h(cu)}</td></tr>
         </tbody>
       </table>
       {data.notes&&<div style={{fontSize:10,color:pk.text,marginTop:10,padding:"8px 10px",background:"#F9FAFB",borderRadius:8,border:`1px solid ${pk.border}`}}><strong>Note :</strong> {data.notes}</div>}
       <div style={{fontSize:9,color:pk.muted,marginTop:8}}>Pauses : {pr.pauseMatinHeure||D_PM_H}–{pr.pauseMatinFin||D_PM_F} + {pr.pauseMidiDebut||D_PD_D}–{pr.pauseMidiFin||D_PD_F}</div>
-      {data.report&&<div style={{marginTop:12,padding:"12px 14px",background:"#F0F9FF",borderRadius:10,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
+      {data.report&&!isPartiel&&<div style={{marginTop:12,padding:"12px 14px",background:"#F0F9FF",borderRadius:10,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
         <div style={{fontWeight:700,marginBottom:8,color:"#1E40AF",fontSize:11}}>Compteur de report</div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`1px solid #DBEAFE`}}>
           <span style={{fontSize:10,color:pk.sub}}>Heures travaillées</span><span style={{fontSize:12}}>{m2h(data.report.travaille||cu)}</span>
@@ -375,7 +381,10 @@ window.MonReleve=function MonReleve(){
           <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:`2px solid #1E40AF`,marginTop:4,background:"#EFF6FF",margin:"4px -14px 0",padding:"8px 14px",borderRadius:"0 0 6px 6px"}}><span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>Compteur actuel</span><span style={{fontSize:15,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
         </div>
       </div>}
-      {data.valideA&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
+      {isPartiel&&<div style={{marginTop:12,padding:"10px 14px",background:"#FEF3C7",borderRadius:10,border:`1px solid #FDE68A`,fontSize:10,color:"#92400E"}}>
+        Relevé partiel — Clôture {moisLabel}. Le compteur de report figure sur le relevé complet de la semaine.
+      </div>}
+      {data.valideA&&!isPartiel&&<div style={{fontSize:10,color:pk.accent,marginTop:6,fontWeight:600}}>✓ Validé le {new Date(data.valideA).toLocaleDateString("fr-FR")} à {new Date(data.valideA).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>}
       <div style={{display:"flex",gap:14,marginTop:20}}><div style={{flex:1,border:`1px solid ${pk.border}`,borderRadius:10,padding:12,minHeight:50}}><div style={{fontSize:8,color:pk.muted,textTransform:"uppercase",letterSpacing:.5}}>Signature salarié</div></div><div style={{flex:1,border:`1px solid ${pk.border}`,borderRadius:10,padding:12,minHeight:50}}><div style={{fontSize:8,color:pk.muted,textTransform:"uppercase",letterSpacing:.5}}>Signature responsable</div></div></div>
       <div style={{fontSize:8,color:pk.muted,marginTop:10,textAlign:"right"}}>Mon Relevé v{VERSION}</div>
     </div>);
@@ -436,10 +445,18 @@ window.MonReleve=function MonReleve(){
   if(!wd)return<div style={st.app}><div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}><IClock color={P.teal} size={32}/></div></div>;
 
   // ── Validation popup ──
-  if(pop&&wd){return(
+  if(pop&&wd){
+    const chevalPop=lun.getMonth()!==ven.getMonth()||lun.getFullYear()!==ven.getFullYear();
+    const m1={m:lun.getMonth(),y:lun.getFullYear()};const m2p={m:ven.getMonth(),y:ven.getFullYear()};
+    return(
     <div style={st.app}>
-      <div style={st.topBar}><button onClick={()=>setPop(false)} style={st.topBtn}>← Retour</button></div>
-      <Releve data={wd} ck={ck} l={lun} v={ven}/>
+      <div style={st.topBar}><button onClick={()=>{setPop(false);setPdfMois(null);}} style={st.topBtn}>← Retour</button></div>
+      {chevalPop&&<div style={{display:"flex",gap:6,padding:"0 16px 8px",justifyContent:"center"}}>
+        <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===m1.m?null:m1)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===m1.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===m1.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===m1.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[m1.m]}</button>
+        <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===m2p.m?null:m2p)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===m2p.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===m2p.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===m2p.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[m2p.m]}</button>
+        <button onClick={()=>setPdfMois(null)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${!pdfMois?P.teal:P.border}`,background:!pdfMois?"rgba(45,212,168,.1)":"transparent",color:!pdfMois?P.teal:P.sub,cursor:"pointer"}}>Complet</button>
+      </div>}
+      <Releve data={wd} ck={ck} l={lun} v={ven} moisFilter={pdfMois}/>
       <div style={{padding:"0 16px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
         <button onClick={()=>window.print()} style={{...st.cta,width:"100%",maxWidth:280}}>Exporter en PDF</button>
         <p style={{fontSize:11,color:P.sub,textAlign:"center"}}>Enregistrez le PDF puis partagez-le par mail ou AirDrop.</p>
@@ -448,10 +465,15 @@ window.MonReleve=function MonReleve(){
   );}
 
   // ── Archive detail ──
-  if(arch){const al=getLunCle(arch.cle);return(
+  if(arch){const al=getLunCle(arch.cle);const av=new Date(al.getTime()+4*MS_DAY);const chevalArch=al.getMonth()!==av.getMonth()||al.getFullYear()!==av.getFullYear();const ma1={m:al.getMonth(),y:al.getFullYear()};const ma2={m:av.getMonth(),y:av.getFullYear()};return(
     <div style={st.app}>
-      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);}} style={st.topBtn}>← Historique</button><button onClick={()=>window.print()} style={st.topAct}>PDF</button></div>
-      <Releve data={arch.data} ck={arch.cle} l={al} v={new Date(al.getTime()+4*MS_DAY)}/>
+      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);setPdfMois(null);}} style={st.topBtn}>← Historique</button><button onClick={()=>window.print()} style={st.topAct}>PDF</button></div>
+      {chevalArch&&<div style={{display:"flex",gap:6,padding:"0 16px 8px",justifyContent:"center"}}>
+        <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===ma1.m?null:ma1)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===ma1.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===ma1.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===ma1.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[ma1.m]}</button>
+        <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===ma2.m?null:ma2)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===ma2.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===ma2.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===ma2.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[ma2.m]}</button>
+        <button onClick={()=>setPdfMois(null)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${!pdfMois?P.teal:P.border}`,background:!pdfMois?"rgba(45,212,168,.1)":"transparent",color:!pdfMois?P.teal:P.sub,cursor:"pointer"}}>Complet</button>
+      </div>}
+      <Releve data={arch.data} ck={arch.cle} l={al} v={av} moisFilter={pdfMois}/>
       <div style={{padding:"0 16px 32px"}}>
         {!cfDel?<button onClick={()=>setCfDel(true)} style={{...st.sec,width:"100%",color:P.red}}>Supprimer ce relevé</button>
           :<div style={{background:"rgba(239,68,68,.1)",borderRadius:18,padding:16}}>
