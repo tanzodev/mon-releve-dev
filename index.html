@@ -51,21 +51,21 @@ const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
 const MOTIFS_NEUTRES = ["Maladie","Sans solde","Autre"];
 function objJour(ct){return ct==="CDI — 39h"?468:420;} // objectif journalier travaillé : 7h48 ou 7h
-function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // valorisation CP/Férié : 8h ou 7h (PDF + compteur)
+function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // valorisation CYFAC : 8h ou 7h (PDF uniquement)
 function calcReport(jours,contrat,cfg){
   const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvAbs=absAffJour(contrat);
-  let travaille=0,valorise=0,neutre=0;
+  let travaille=0,neutre=0,valorisePDF=0;
   jours.forEach(j=>{
     if(!j.absence){travaille+=cNet(j.arrivee,j.depart,cfg);}
     else{
       const mult=j.demiJournee?0.5:1;
       if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
-      if(MOTIFS_VALORISES.includes(j.motif)){valorise+=Math.round(dvAbs*mult);}
-      else if(MOTIFS_NEUTRES.includes(j.motif)){neutre+=Math.round(dv*mult);}
+      neutre+=Math.round(dv*mult);
+      if(MOTIFS_VALORISES.includes(j.motif)){valorisePDF+=Math.round(dvAbs*mult);}
     }
   });
-  const objAjuste=objM-neutre;const total=travaille+valorise;const ecart=total-objAjuste;
-  return{travaille,valorise,neutre,objAjuste,total,ecart,valorisePDF:valorise};
+  const objAjuste=objM-neutre;const total=travaille;const ecart=total-objAjuste;
+  return{travaille,valorise:0,neutre,objAjuste,total,ecart,valorisePDF};
 }
 
 // ── Constants ──
@@ -132,7 +132,7 @@ function recalcCounter(n){
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+reportable));
     const applique=apres-cnt;
-    w.data.report={avant:cnt,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:rpt.valorise,neutre:rpt.neutre,objAjuste:rpt.objAjuste};
+    w.data.report={avant:cnt,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:0,neutre:rpt.neutre,objAjuste:rpt.objAjuste,valoPDF:rpt.valorisePDF};
     svSem(w.cle,n,w.data);
     cnt=apres;
   });
@@ -144,39 +144,24 @@ function svProf(p){try{localStorage.setItem(`${PX}prof`,JSON.stringify(p));}catc
 function allSem(n){try{const pfx=`${PX}${n}_`;return Object.keys(localStorage).filter(k=>k.startsWith(pfx)).map(k=>{const c=k.slice(pfx.length);return{cle:c,data:ldSem(c,n)};}).filter(w=>w.data).sort((a,b)=>b.cle.localeCompare(a.cle));}catch{return[];}}
 function mStats(n,ct,semNum,cfg){
   const now=new Date();const mo=now.getMonth(),yr=now.getFullYear();
-  const dailyObj=((H_OBJ[ct]||DEF_OBJ)*60)/5;
-  const dvAbs=absAffJour(ct);const dv=objJour(ct);
+  const dailyObj=((H_OBJ[ct]||DEF_OBJ)*60)/5;const dv=objJour(ct);
   const results=[];
   allSem(n).forEach(({cle,data})=>{
     const lun=getLunCle(cle);const num=parseInt(cle.split("-S")[1]);
-    let daysIn=0,absCount=0;const absMotifs={};
+    let daysIn=0,tot=0,absCount=0,neutreM=0;const absMotifs={};
     data.jours.forEach((j,i)=>{
       const day=new Date(lun);day.setDate(day.getDate()+i);
       if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
       daysIn++;
-      if(j.absence){const mult=j.demiJournee?0.5:1;absCount+=mult;const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;}
+      if(j.absence){
+        const mult=j.demiJournee?0.5:1;absCount+=mult;
+        const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
+        if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
+        neutreM+=Math.round(dv*mult);
+      }else{tot+=cNet(j.arrivee,j.depart,cfg);}
     });
     if(daysIn===0)return;
-    let tot,obj;
-    if(data.valide&&data.report&&daysIn<5){
-      const ratio=daysIn/5;
-      const weekTotal=(data.report.travaille||0)+(data.report.valorise||0);
-      tot=Math.round(weekTotal*ratio);
-      obj=Math.round((data.report.objAjuste||0)*ratio);
-    }else{
-      tot=0;let neutreM=0;
-      data.jours.forEach((j,i)=>{
-        const day=new Date(lun);day.setDate(day.getDate()+i);
-        if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
-        if(j.absence){
-          const mult=j.demiJournee?0.5:1;
-          if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
-          if(MOTIFS_VALORISES.includes(j.motif)){tot+=Math.round(dvAbs*mult);}
-          else if(MOTIFS_NEUTRES.includes(j.motif)){neutreM+=Math.round(dv*mult);}
-        }else{tot+=cNet(j.arrivee,j.depart,cfg);}
-      });
-      obj=Math.round(daysIn*dailyObj)-neutreM;
-    }
+    const obj=Math.round(daysIn*dailyObj)-neutreM;
     results.push({num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
   });
   return results.sort((a,b)=>a.num-b.num);
@@ -290,7 +275,7 @@ window.MonReleve=function MonReleve(){
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,avant+reportable));
     const applique=apres-avant;
-    const report={avant,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:rpt.valorise,neutre:rpt.neutre,objAjuste:rpt.objAjuste,valorisePDF:rpt.valorisePDF};
+    const report={avant,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:0,neutre:rpt.neutre,objAjuste:rpt.objAjuste,valoPDF:rpt.valorisePDF};
     svCounter(apres);
     sv({...wd,valide:true,valideA:new Date().toISOString(),report});
     setPop(true);flash("Semaine validée ✓");
@@ -372,17 +357,14 @@ window.MonReleve=function MonReleve(){
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`1px solid #DBEAFE`}}>
           <span style={{fontSize:10,color:pk.sub}}>Heures travaillées</span><span style={{fontSize:12}}>{m2h(data.report.travaille||cu)}</span>
         </div>
-        {(data.report.valorisePDF||data.report.valorise)>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
-          <span style={{fontSize:10,color:"#059669"}}>Absences valorisées (CP/Férié)</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(data.report.valorisePDF||data.report.valorise)}</span>
-        </div>}
-        {data.report.neutre>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
-          <span style={{fontSize:10,color:pk.sub}}>Absences neutres (objectif ajusté)</span><span style={{fontSize:10,color:pk.muted}}>−{m2h(data.report.neutre)}</span>
-        </div>}
+        {(()=>{const vp=data.report.valoPDF||data.report.valorisePDF||data.report.valorise||0;return vp>0?<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{fontSize:10,color:"#059669"}}>Absences valorisées CYFAC</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(vp)}</span>
+        </div>:null;})()}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"12px 14px"}}>
-          <span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:18,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valorisePDF||data.report.valorise||0))}</span>
+          <span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:18,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valoPDF||data.report.valorisePDF||data.report.valorise||0))}</span>
         </div>
         <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",marginTop:5}}>
-          <span style={{fontSize:9,color:pk.muted}}>Objectif{data.report.neutre>0?" ajusté":""}</span><span style={{fontSize:9,color:pk.muted}}>{m2h(data.report.objAjuste||(H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
+          <span style={{fontSize:9,color:pk.muted}}>Objectif contractuel</span><span style={{fontSize:9,color:pk.muted}}>{m2h((H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
         </div>
         <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
           <span style={{fontSize:9,color:pk.muted}}>Écart semaine</span><span style={{fontSize:9,color:data.report.ecart>=0?"#059669":"#DC2626",fontWeight:600}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
@@ -517,7 +499,7 @@ window.MonReleve=function MonReleve(){
               <div style={{fontSize:38,fontWeight:800,color:P.text,letterSpacing:-2,marginTop:1}}>{m2h(totMin)}</div>
             </div>
             <div style={{textAlign:"right",marginBottom:6}}>
-              <div style={{fontSize:11,color:P.muted}}>sur {H_OBJ[pr.contrat]||DEF_OBJ}h prévues</div>
+              <div style={{fontSize:11,color:P.muted}}>sur {curReport?m2h(curReport.objAjuste):(H_OBJ[pr.contrat]||DEF_OBJ)+"h"} prévues</div>
             </div>
           </div>
           <div style={{marginTop:8,height:5,borderRadius:3,background:P.card,overflow:"hidden"}}>
@@ -748,10 +730,11 @@ window.MonReleve=function MonReleve(){
                 {id:"abs",t:"Absences",c:<>
                   <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif. Choisir entre journée complète ou demi-journée.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
-                    <span style={{fontWeight:600,color:P.teal}}>Valorisées</span> : Congé payé, Jour férié<br/>
-                    <span style={{fontSize:11}}>Journée : 8h (39h) / 7h (35h) · Demi-journée : 4h (39h) / 3h30 (35h)</span></div>
-                  <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
-                    <span style={{fontWeight:600,color:P.muted}}>Neutres</span> : Maladie, Sans solde, Autre → réduisent l'objectif sans ajouter de crédit</div>
+                    <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
+                    <span style={{fontSize:11}}>Toutes les absences réduisent l'objectif de la semaine. Seules les heures réellement travaillées sont comptabilisées.</span></div>
+                  <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
+                    <span style={{fontWeight:600,color:P.muted}}>Valorisation CYFAC (PDF uniquement)</span><br/>
+                    <span style={{fontSize:11}}>CP et Férié : 8h / 4h (39h) · 7h / 3h30 (35h). Mentionné sur le relevé PDF à titre informatif pour la comptabilité.</span></div>
                 </>},
                 {id:"cpt",t:"Compteur de report",c:<>
                   <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
