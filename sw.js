@@ -4,7 +4,7 @@
  */
 
 const APP_VERSION = '2.1';
-const CACHE_CORE = 'mr-core-v2.2.2';
+const CACHE_CORE = 'mr-core-v2.2.3';
 const CACHE_CDN = 'mr-cdn-v1';
 
 const CORE_ASSETS = [
