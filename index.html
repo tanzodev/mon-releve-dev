@@ -439,11 +439,22 @@ window.MonReleve=function MonReleve(){
         {/* Démarrage compteur */}
         <div style={{paddingTop:14,marginTop:14,borderTop:`1px solid ${P.border}`}}>
           <div style={{fontSize:13,fontWeight:600,color:P.text}}>Démarrage compteur</div>
-          <div style={{fontSize:11,color:P.sub,marginTop:2,marginBottom:8}}>Le compteur de report démarre à zéro à partir de cette semaine. Les relevés antérieurs sont ignorés.</div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{flex:1,fontSize:13,color:P.teal,fontWeight:600}}>{pr.compteurDebut?`S${parseInt(pr.compteurDebut.split("-S")[1])} — ${pr.compteurDebut.split("-S")[0]}`:`S${String(getSem(new Date()).n).padStart(2,"0")} — ${getSem(new Date()).y} (auto)`}</div>
-            <button onClick={()=>{const c=cleS(getSem(new Date()));setPr({...pr,compteurDebut:c});flash("Compteur réinitialisé à S"+getSem(new Date()).n);}} style={{...st.sec,fontSize:11,padding:"6px 12px",whiteSpace:"nowrap"}}>Réinitialiser</button>
-          </div>
+          <div style={{fontSize:11,color:P.sub,marginTop:2,marginBottom:8}}>Le compteur de report démarre à zéro à partir de cette semaine.</div>
+          {(()=>{
+            const curDebut=pr.compteurDebut||cleS(getSem(new Date()));
+            const debutY=parseInt(curDebut.split("-S")[0]);
+            const debutN=parseInt(curDebut.split("-S")[1]);
+            const shiftDebut=(dir)=>{
+              let ny=debutY,nn=debutN+dir;
+              if(nn<1){ny--;nn=52;}else if(nn>52){ny++;nn=1;}
+              setPr({...pr,compteurDebut:`${ny}-S${String(nn).padStart(2,"0")}`});
+            };
+            return<div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>shiftDebut(-1)} style={{background:"none",border:"none",color:P.teal,fontSize:20,cursor:"pointer",padding:"4px 8px"}}>‹</button>
+              <div style={{flex:1,textAlign:"center",fontSize:14,fontWeight:700,color:P.teal}}>S{String(debutN).padStart(2,"0")} — {debutY}</div>
+              <button onClick={()=>shiftDebut(1)} style={{background:"none",border:"none",color:P.teal,fontSize:20,cursor:"pointer",padding:"4px 8px"}}>›</button>
+            </div>;
+          })()}
         </div>
       </div>
       <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
