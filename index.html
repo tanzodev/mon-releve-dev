@@ -49,7 +49,6 @@ const VERSION = "2.0";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
-const MOTIFS_NEUTRES = ["Maladie","Sans solde","Autre"];
 function objJour(ct){return ct==="CDI — 39h"?468:420;} // objectif journalier travaillé : 7h48 ou 7h
 function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // valorisation CYFAC : 8h ou 7h (PDF uniquement)
 function calcReport(jours,contrat,cfg){
@@ -358,29 +357,31 @@ window.MonReleve=function MonReleve(){
       </table>
       {data.notes&&<div style={{fontSize:10,color:pk.text,marginTop:10,padding:"8px 10px",background:"#F9FAFB",borderRadius:8,border:`1px solid ${pk.border}`}}><strong>Note :</strong> {data.notes}</div>}
       <div style={{fontSize:9,color:pk.muted,marginTop:8}}>Pauses : {pr.pauseMatinHeure||D_PM_H}–{pr.pauseMatinFin||D_PM_F} + {pr.pauseMidiDebut||D_PD_D}–{pr.pauseMidiFin||D_PD_F}</div>
-      {data.report&&!isPartiel&&<div style={{marginTop:12,padding:"12px 14px",background:"#F0F9FF",borderRadius:10,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
-        <div style={{fontWeight:700,marginBottom:8,color:"#1E40AF",fontSize:11}}>Compteur de report</div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"8px 0",borderBottom:`1px solid #DBEAFE`}}>
-          <span style={{fontSize:10,color:pk.sub}}>Heures travaillées</span><span style={{fontSize:12}}>{m2h(data.report.travaille||cu)}</span>
+      {data.report&&!isPartiel&&(()=>{
+        const vp=data.report.valoPDF||data.report.valorisePDF||data.report.valorise||0;
+        const totalRH=(data.report.travaille||cu)+vp;
+        const objC=(H_OBJ[pr.contrat]||DEF_OBJ)*60;
+        return<div style={{marginTop:12,padding:"12px 14px",background:"#F0F9FF",borderRadius:10,border:`1px solid #BFDBFE`,fontSize:10,color:pk.text}}>
+        <div style={{fontWeight:700,marginBottom:8,color:"#1E40AF",fontSize:11}}>Décompte hebdomadaire</div>
+        <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{color:pk.sub}}>Heures travaillées</span><span style={{fontSize:12}}>{m2h(data.report.travaille||cu)}</span>
         </div>
-        {(()=>{const vp=data.report.valoPDF||data.report.valorisePDF||data.report.valorise||0;return vp>0?<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
-          <span style={{fontSize:10,color:"#059669"}}>Absences valorisées CYFAC</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(vp)}</span>
-        </div>:null;})()}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",borderBottom:`2px solid #1E40AF`,background:"#EFF6FF",margin:"4px -14px 0",padding:"12px 14px"}}>
-          <span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>TOTAL COMPTABILISÉ</span><span style={{fontSize:18,fontWeight:800,color:"#1E40AF"}}>{m2h((data.report.travaille||cu)+(data.report.valoPDF||data.report.valorisePDF||data.report.valorise||0))}</span>
+        {vp>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid #DBEAFE`}}>
+          <span style={{color:"#059669"}}>Absences (valorisation CYFAC)</span><span style={{fontSize:12,color:"#059669"}}>+{m2h(vp)}</span>
+        </div>}
+        <div style={{display:"flex",justifyContent:"space-between",background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px",borderBottom:`2px solid #1E40AF`}}>
+          <span style={{fontSize:11,fontWeight:800,color:"#1E40AF"}}>TOTAL RELEVÉ (valorisation RH)</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h(totalRH)}</span>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",marginTop:5}}>
-          <span style={{fontSize:9,color:pk.muted}}>Objectif contractuel</span><span style={{fontSize:9,color:pk.muted}}>{m2h((H_OBJ[pr.contrat]||DEF_OBJ)*60)}</span>
+        {vp>0&&<div style={{fontSize:8,color:pk.muted,padding:"4px 0",fontStyle:"italic"}}>La valorisation CYFAC (CP/Férié = {pr.contrat==="CDI — 39h"?"8h":"7h"}/jour) est informative. Le compteur ci-dessous utilise le temps contractuel ({pr.contrat==="CDI — 39h"?"7h48":"7h"}/jour).</div>}
+        <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid #DBEAFE`}}>
+          <div style={{fontWeight:700,marginBottom:6,color:"#1E40AF",fontSize:10}}>Compteur de report (temps contractuel)</div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:9,color:pk.muted}}>Objectif contractuel</span><span style={{fontSize:9,color:pk.muted}}>{m2h(objC)}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:9,color:pk.muted}}>Écart semaine</span><span style={{fontSize:9,color:data.report.ecart>=0?"#059669":"#DC2626",fontWeight:600}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:9,color:pk.muted}}>Compteur précédent</span><span style={{fontSize:9,color:pk.muted}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:9,color:pk.muted}}>Report appliqué (±3h max)</span><span style={{fontSize:9,color:pk.muted}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",background:"#EFF6FF",margin:"4px -14px 0",padding:"8px 14px",borderTop:`2px solid #1E40AF`,borderRadius:"0 0 6px 6px"}}><span style={{fontSize:11,fontWeight:800,color:"#1E40AF"}}>Compteur actuel</span><span style={{fontSize:14,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
-          <span style={{fontSize:9,color:pk.muted}}>Écart semaine</span><span style={{fontSize:9,color:data.report.ecart>=0?"#059669":"#DC2626",fontWeight:600}}>{data.report.ecart>0?"+":data.report.ecart<0?"−":""}{m2h(Math.abs(data.report.ecart))}</span>
-        </div>
-        <div style={{borderTop:`1px solid #DBEAFE`,marginTop:4,paddingTop:5}}>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{fontSize:9,color:pk.muted}}>Compteur précédent</span><span style={{fontSize:9,color:pk.muted}}>{data.report.avant>0?"+":data.report.avant<0?"−":""}{m2h(Math.abs(data.report.avant))}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span style={{fontSize:9,color:pk.muted}}>Report appliqué</span><span style={{fontSize:9,color:pk.muted}}>{data.report.applique>0?"+":data.report.applique<0?"−":""}{m2h(Math.abs(data.report.applique))}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:`2px solid #1E40AF`,marginTop:4,background:"#EFF6FF",margin:"4px -14px 0",padding:"8px 14px",borderRadius:"0 0 6px 6px"}}><span style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>Compteur actuel</span><span style={{fontSize:15,fontWeight:800,color:"#1E40AF"}}>{data.report.apres>0?"+":data.report.apres<0?"−":""}{m2h(Math.abs(data.report.apres))}</span></div>
-        </div>
-      </div>}
+      </div>})()}
       {isPartiel&&<div style={{marginTop:12,padding:"10px 14px",background:"#FEF3C7",borderRadius:10,border:`1px solid #FDE68A`,fontSize:10,color:"#92400E"}}>
         Relevé partiel — Clôture {moisLabel}. Le compteur de report figure sur le relevé complet de la semaine.
       </div>}
@@ -743,40 +744,52 @@ window.MonReleve=function MonReleve(){
             {aideOpen&&<div style={{marginTop:10}}>
               {[
                 {id:"usage",t:"Utilisation",c:<>
-                  <div style={{marginBottom:4}}>Chaque jour, saisissez votre heure d'arrivée et de départ. Tapez les chiffres directement (ex: 830 → 08:30, 1730 → 17:30).</div>
-                  <div style={{marginBottom:4}}>Le pointage rapide permet d'enregistrer l'heure exacte en un tap (boutons ↓ et ↑). Les pauses sont déduites automatiquement.</div>
+                  <div style={{marginBottom:4}}>Chaque jour, saisissez votre heure d'arrivée et de départ. Tapez les chiffres directement (ex: 0830 → 08:30).</div>
+                  <div style={{marginBottom:4}}>Le pointage rapide enregistre l'heure exacte en un tap. Les pauses sont déduites automatiquement selon vos réglages.</div>
                   <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Validation</div>
-                  <div style={{marginBottom:4}}>En fin de semaine, vérifiez vos heures puis tapez "Valider et envoyer".</div>
+                  <div style={{marginBottom:4}}>En fin de semaine, vérifiez vos heures puis tapez "Valider et envoyer". La semaine est verrouillée. Vous pouvez la déverrouiller pour modifier puis revalider.</div>
                   <div style={{color:P.orange,fontWeight:600}}>Seul le relevé validé et transmis à l'employeur fait foi.</div>
                 </>},
-                {id:"abs",t:"Absences",c:<>
-                  <div style={{marginBottom:6}}>Déclarer chaque jour d'absence avec le motif. Choisir entre journée complète ou demi-journée.</div>
+                {id:"abs",t:"Absences & demi-journées",c:<>
+                  <div style={{marginBottom:6}}>Activez "Absence" sur le jour concerné, choisissez le motif et sélectionnez journée complète ou demi-journée.</div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Motifs disponibles</div>
+                  <div style={{marginBottom:4}}>Congé payé · Jour férié · Maladie · Sans solde · Autre (texte libre).</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
-                    <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
-                    <span style={{fontSize:11}}>Toutes les absences réduisent l'objectif de la semaine. Seules les heures réellement travaillées sont comptabilisées.</span></div>
-                  <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
+                    <span style={{fontWeight:600,color:P.teal}}>Comment ça marche</span><br/>
+                    <span style={{fontSize:11}}>Toute absence réduit l'objectif de la semaine. Seules les heures réellement travaillées sont comptées. Aucune heure fictive n'est ajoutée au compteur.</span></div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Demi-journée</div>
+                  <div style={{marginBottom:4}}>Saisissez les horaires de la demi-journée travaillée (arrivée/départ). L'autre demi-journée est couverte par l'absence.</div>
+                  <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
                     <span style={{fontWeight:600,color:P.muted}}>Valorisation CYFAC (PDF uniquement)</span><br/>
-                    <span style={{fontSize:11}}>CP et Férié : 8h / 4h (39h) · 7h / 3h30 (35h). Mentionné sur le relevé PDF à titre informatif pour la comptabilité.</span></div>
+                    <span style={{fontSize:11}}>Les CP et jours fériés sont mentionnés sur le PDF à leur valeur CYFAC (8h/4h pour un 39h · 7h/3h30 pour un 35h). Cette mention est purement informative pour la comptabilité. Le compteur interne utilise le temps contractuel (7h48 ou 7h par jour).</span></div>
                 </>},
                 {id:"cpt",t:"Compteur de report",c:<>
-                  <div style={{marginBottom:4}}>L'écart entre vos heures comptabilisées et l'objectif est reporté automatiquement d'une semaine à l'autre.</div>
-                  <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul.</div>
+                  <div style={{marginBottom:4}}>L'écart entre vos heures travaillées et l'objectif ajusté est reporté d'une semaine à l'autre.</div>
+                  <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul global.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)",fontSize:11}}>
-                    <strong>Exemple :</strong> Semaine à 41h sur contrat 39h → écart +2h → compteur passe de 0 à +2h.</div>
-                  <div>Le compteur est recalculé automatiquement en cas de modification ou suppression d'un relevé.</div>
+                    <strong>Exemple (39h) :</strong> Semaine à 40h sans absence → objectif 39h → écart +1h → compteur passe de 0 à +1h.<br/>
+                    <strong>Avec 1 CP :</strong> 32h travaillées → objectif réduit à 31h12 (4 jours) → écart +0h48 → reporté au compteur.</div>
+                  <div>Le compteur est recalculé automatiquement en cas de modification, suppression ou restauration d'un relevé.</div>
                 </>},
-                {id:"sav",t:"Sauvegarde & PDF",c:<>
-                  <div style={{marginBottom:4}}>Effectuez une sauvegarde au minimum 1 fois par mois depuis le tableau de bord. Conservez le fichier dans iCloud Drive (iPhone) ou Google Drive (Android).</div>
-                  <div style={{marginBottom:4}}>Le PDF contient : heures travaillées, absences valorisées, total comptabilisé, objectif ajusté, et le compteur de report.</div>
-                  <div>Les statistiques mensuelles répartissent automatiquement les jours des semaines à cheval dans le mois concerné.</div>
+                {id:"cheval",t:"Semaines à cheval",c:<>
+                  <div style={{marginBottom:4}}>Quand une semaine chevauche deux mois (ex: S27 = 29 juin – 3 juillet), l'application le gère automatiquement.</div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Statistiques mensuelles</div>
+                  <div style={{marginBottom:4}}>Chaque jour est comptabilisé dans son mois réel. Les heures et l'objectif sont calculés jour par jour.</div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>PDF partiels</div>
+                  <div>Pour l'envoi anticipé (clôture de mois), un bouton "PDF clôture" permet de générer un relevé partiel contenant uniquement les jours du mois concerné, sans attendre la fin de semaine.</div>
                 </>},
-                {id:"priv",t:"Confidentialité",c:<>
-                  <div style={{marginBottom:4}}>Vos données sont stockées exclusivement sur votre appareil. Aucune donnée n'est transmise à un serveur distant. Aucun compte utilisateur, aucun cookie, aucune collecte analytique.</div>
-                  <div style={{marginBottom:4}}>Le motif "Maladie" (donnée de santé, art. 9 RGPD) est traité sur base légale (obligation de suivi du temps de travail). Seul le motif générique est enregistré.</div>
+                {id:"sav",t:"Sauvegarde & restauration",c:<>
+                  <div style={{marginBottom:4}}>Effectuez une sauvegarde régulière (minimum 1 fois par mois) depuis le tableau de bord. Le fichier JSON contient l'ensemble de vos données.</div>
+                  <div style={{marginBottom:4}}>Conservez-le dans iCloud Drive (iPhone) ou Google Drive (Android).</div>
+                  <div>Pour restaurer : depuis l'écran d'accueil, tapez "Restaurer une sauvegarde" et sélectionnez le fichier. Le compteur et toutes les semaines sont recalculés automatiquement.</div>
+                </>},
+                {id:"priv",t:"Confidentialité & RGPD",c:<>
+                  <div style={{marginBottom:4}}>Vos données sont stockées exclusivement sur votre appareil (localStorage). Aucune donnée n'est transmise à un serveur. Aucun compte, aucun cookie, aucune collecte analytique.</div>
+                  <div style={{marginBottom:4}}>Le motif "Maladie" (donnée de santé, art. 9 RGPD) est traité sur base légale. Seul le motif générique est enregistré, sans indication sur la pathologie.</div>
                   <div><button onClick={()=>setPrivOpen(true)} style={{background:"none",border:"none",color:P.teal,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Voir la notice complète ›</button></div>
                 </>},
                 {id:"new",t:"Nouveautés V2",c:<>
-                  {["Compteur de report automatique","Demi-journées d'absence","Valorisation unifiée CP/Férié (PDF et compteur)","Gestion des semaines à cheval","Absences valorisées et neutres","Verrouillage des relevés validés","Tableau de bord et statistiques mensuelles","Export PDF avec compteur de report","Sauvegarde et restauration JSON"].map((item,i)=>(
+                  {["Compteur de report automatique (±3h/semaine, ±6h cumul)","Demi-journées d'absence","PDF partiels pour semaines à cheval","Semaines à cheval gérées dans les statistiques","Moteur unique : seules les heures réelles comptent","Valorisation CYFAC informative sur le PDF","Verrouillage et déverrouillage des relevés","Tableau de bord avec synthèse mensuelle","Sauvegarde et restauration JSON complètes","Notice et confidentialité RGPD intégrées"].map((item,i)=>(
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",lineHeight:1.6}}><span style={{color:P.teal,flexShrink:0}}>✓</span><span>{item}</span></div>
                   ))}
                 </>}
