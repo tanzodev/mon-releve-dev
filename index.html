@@ -212,7 +212,7 @@ function TimeInput({value,onChange,label,noHistory}){
     <div style={{position:"relative"}}>
       {label&&<div style={st.iL}>{label}</div>}
       <div style={{position:"relative",display:"flex",alignItems:"center"}}>
-        <input ref={inputRef} type="text" inputMode="numeric" value={displayVal}
+        <input ref={inputRef} type="text" inputMode="numeric" autoComplete="off" value={displayVal}
           onFocus={handleFocus} onBlur={handleBlur} onChange={handleChange} onKeyDown={handleKeyDown}
           style={{...st.tI,color:hasVal?P.text:P.dim,fontVariantNumeric:"tabular-nums",paddingRight:hasVal&&focused?32:12,...(err?{borderColor:P.red}:{})}}
         />
