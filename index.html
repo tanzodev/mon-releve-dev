@@ -125,7 +125,8 @@ function ldCounter(){try{const v=localStorage.getItem(`${PX}report_counter`);ret
 function svCounter(v){try{localStorage.setItem(`${PX}report_counter`,String(v));}catch{}}
 function recalcCounter(n){
   const cfg=ldProf();
-  const weeks=allSem(n).filter(w=>w.data&&w.data.valide).sort((a,b)=>a.cle.localeCompare(b.cle));
+  const debut=cfg.compteurDebut||cleS(getSem(new Date()));
+  const weeks=allSem(n).filter(w=>w.data&&w.data.valide&&w.cle>=debut).sort((a,b)=>a.cle.localeCompare(b.cle));
   let cnt=0;
   weeks.forEach(w=>{
     const rpt=calcReport(w.data.jours,cfg.contrat,cfg);
@@ -139,7 +140,7 @@ function recalcCounter(n){
   svCounter(cnt);
   return cnt;
 }
-function ldProf(){try{const r=localStorage.getItem(`${PX}prof`);if(r){const p=JSON.parse(r);const matH=p.pauseMatinHeure||D_PM_H;let matF=p.pauseMatinFin;if(!matF&&p.pauseMatinDuree!==undefined){const mf=t2m(matH)+p.pauseMatinDuree;matF=`${String(Math.floor(mf/60)).padStart(2,"0")}:${String(mf%60).padStart(2,"0")}`;}return{nom:p.nom||p.name||"",contrat:p.contrat||"",entreprise:p.entreprise||p.co||"",pointageRapide:p.pointageRapide!==undefined?p.pointageRapide:(p.quickStamp!==undefined?p.quickStamp:true),pauseMatinHeure:matH,pauseMatinFin:matF||D_PM_F,pauseMidiDebut:p.pauseMidiDebut||D_PD_D,pauseMidiFin:p.pauseMidiFin||D_PD_F};}}catch{}return{nom:"",contrat:"",entreprise:"",pointageRapide:true,pauseMatinHeure:D_PM_H,pauseMatinFin:D_PM_F,pauseMidiDebut:D_PD_D,pauseMidiFin:D_PD_F};}
+function ldProf(){try{const r=localStorage.getItem(`${PX}prof`);if(r){const p=JSON.parse(r);const matH=p.pauseMatinHeure||D_PM_H;let matF=p.pauseMatinFin;if(!matF&&p.pauseMatinDuree!==undefined){const mf=t2m(matH)+p.pauseMatinDuree;matF=`${String(Math.floor(mf/60)).padStart(2,"0")}:${String(mf%60).padStart(2,"0")}`;}return{nom:p.nom||p.name||"",contrat:p.contrat||"",entreprise:p.entreprise||p.co||"",pointageRapide:p.pointageRapide!==undefined?p.pointageRapide:(p.quickStamp!==undefined?p.quickStamp:true),pauseMatinHeure:matH,pauseMatinFin:matF||D_PM_F,pauseMidiDebut:p.pauseMidiDebut||D_PD_D,pauseMidiFin:p.pauseMidiFin||D_PD_F,compteurDebut:p.compteurDebut||""};}}catch{}return{nom:"",contrat:"",entreprise:"",pointageRapide:true,pauseMatinHeure:D_PM_H,pauseMatinFin:D_PM_F,pauseMidiDebut:D_PD_D,pauseMidiFin:D_PD_F,compteurDebut:""};}
 function svProf(p){try{localStorage.setItem(`${PX}prof`,JSON.stringify(p));}catch{}}
 function allSem(n){try{const pfx=`${PX}${n}_`;return Object.keys(localStorage).filter(k=>k.startsWith(pfx)).map(k=>{const c=k.slice(pfx.length);return{cle:c,data:ldSem(c,n)};}).filter(w=>w.data).sort((a,b)=>b.cle.localeCompare(a.cle));}catch{return[];}}
 function mStats(n,ct,semNum,cfg){
@@ -434,6 +435,15 @@ window.MonReleve=function MonReleve(){
               </div>
             </div>
           </div>}
+        </div>
+        {/* Démarrage compteur */}
+        <div style={{paddingTop:14,marginTop:14,borderTop:`1px solid ${P.border}`}}>
+          <div style={{fontSize:13,fontWeight:600,color:P.text}}>Démarrage compteur</div>
+          <div style={{fontSize:11,color:P.sub,marginTop:2,marginBottom:8}}>Le compteur de report démarre à zéro à partir de cette semaine. Les relevés antérieurs sont ignorés.</div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{flex:1,fontSize:13,color:P.teal,fontWeight:600}}>{pr.compteurDebut?`S${parseInt(pr.compteurDebut.split("-S")[1])} — ${pr.compteurDebut.split("-S")[0]}`:`S${String(getSem(new Date()).n).padStart(2,"0")} — ${getSem(new Date()).y} (auto)`}</div>
+            <button onClick={()=>{const c=cleS(getSem(new Date()));setPr({...pr,compteurDebut:c});flash("Compteur réinitialisé à S"+getSem(new Date()).n);}} style={{...st.sec,fontSize:11,padding:"6px 12px",whiteSpace:"nowrap"}}>Réinitialiser</button>
+          </div>
         </div>
       </div>
       <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
