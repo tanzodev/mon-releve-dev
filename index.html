@@ -149,29 +149,21 @@ function mStats(n,ct,semNum,cfg){
   const results=[];
   allSem(n).forEach(({cle,data})=>{
     const lun=getLunCle(cle);const num=parseInt(cle.split("-S")[1]);
-    let daysIn=0,absCount=0;const absMotifs={};
+    let daysIn=0,tot=0,absCount=0,neutreM=0;const absMotifs={};
     data.jours.forEach((j,i)=>{
       const day=new Date(lun);day.setDate(day.getDate()+i);
       if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
       daysIn++;
-      if(j.absence){const mult=j.demiJournee?0.5:1;absCount+=mult;const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;}
+      if(j.absence){
+        const mult=j.demiJournee?0.5:1;
+        absCount+=mult;
+        const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
+        if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
+        neutreM+=Math.round(dv*mult);
+      }else{tot+=cNet(j.arrivee,j.depart,cfg);}
     });
     if(daysIn===0)return;
-    let tot,obj;
-    if(data.valide&&data.report&&daysIn<5){
-      const ratio=daysIn/5;
-      tot=Math.round((data.report.travaille||0)*ratio);
-      obj=Math.round((data.report.objAjuste||0)*ratio);
-    }else{
-      tot=0;let neutreM=0;
-      data.jours.forEach((j,i)=>{
-        const day=new Date(lun);day.setDate(day.getDate()+i);
-        if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
-        if(j.absence){const mult=j.demiJournee?0.5:1;if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}neutreM+=Math.round(dv*mult);}
-        else{tot+=cNet(j.arrivee,j.depart,cfg);}
-      });
-      obj=Math.round(daysIn*dv)-neutreM;
-    }
+    const obj=Math.round(daysIn*dv)-neutreM;
     results.push({num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
   });
   return results.sort((a,b)=>a.num-b.num);
