@@ -145,24 +145,33 @@ function svProf(p){try{localStorage.setItem(`${PX}prof`,JSON.stringify(p));}catc
 function allSem(n){try{const pfx=`${PX}${n}_`;return Object.keys(localStorage).filter(k=>k.startsWith(pfx)).map(k=>{const c=k.slice(pfx.length);return{cle:c,data:ldSem(c,n)};}).filter(w=>w.data).sort((a,b)=>b.cle.localeCompare(a.cle));}catch{return[];}}
 function mStats(n,ct,semNum,cfg){
   const now=new Date();const mo=now.getMonth(),yr=now.getFullYear();
-  const dailyObj=((H_OBJ[ct]||DEF_OBJ)*60)/5;const dv=objJour(ct);
+  const dv=objJour(ct);
   const results=[];
   allSem(n).forEach(({cle,data})=>{
     const lun=getLunCle(cle);const num=parseInt(cle.split("-S")[1]);
-    let daysIn=0,tot=0,absCount=0,neutreM=0;const absMotifs={};
+    let daysIn=0,absCount=0;const absMotifs={};
     data.jours.forEach((j,i)=>{
       const day=new Date(lun);day.setDate(day.getDate()+i);
       if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
       daysIn++;
-      if(j.absence){
-        const mult=j.demiJournee?0.5:1;absCount+=mult;
-        const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
-        if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
-        neutreM+=Math.round(dv*mult);
-      }else{tot+=cNet(j.arrivee,j.depart,cfg);}
+      if(j.absence){const mult=j.demiJournee?0.5:1;absCount+=mult;const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;}
     });
     if(daysIn===0)return;
-    const obj=Math.round(daysIn*dailyObj)-neutreM;
+    let tot,obj;
+    if(data.valide&&data.report&&daysIn<5){
+      const ratio=daysIn/5;
+      tot=Math.round((data.report.travaille||0)*ratio);
+      obj=Math.round((data.report.objAjuste||0)*ratio);
+    }else{
+      tot=0;let neutreM=0;
+      data.jours.forEach((j,i)=>{
+        const day=new Date(lun);day.setDate(day.getDate()+i);
+        if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
+        if(j.absence){const mult=j.demiJournee?0.5:1;if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}neutreM+=Math.round(dv*mult);}
+        else{tot+=cNet(j.arrivee,j.depart,cfg);}
+      });
+      obj=Math.round(daysIn*dv)-neutreM;
+    }
     results.push({num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
   });
   return results.sort((a,b)=>a.num-b.num);
@@ -403,7 +412,7 @@ window.MonReleve=function MonReleve(){
       <div style={st.sCard}>
         <div style={st.fg}><label style={st.fl}>Entreprise</label><input type="text" placeholder="Nom" value={pr.entreprise||""} onChange={e=>setPr({...pr,entreprise:e.target.value})} style={st.fi} autoFocus/></div>
         <div style={st.fg}><label style={st.fl}>Nom complet</label><input type="text" placeholder="Prénom Nom" value={pr.nom} onChange={e=>setPr({...pr,nom:e.target.value})} style={st.fi}/></div>
-        <div style={st.fg}><label style={st.fl}>Contrat</label><select value={pr.contrat} onChange={e=>setPr({...pr,contrat:e.target.value})} style={st.fs}><option value="">— Sélectionner —</option>{CONTRATS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+        <div style={st.fg}><label style={st.fl}>Contrat</label><select value={pr.contrat} onChange={e=>setPr({...pr,contrat:e.target.value})} style={st.fi}><option value="">— Sélectionner —</option>{CONTRATS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:14,borderTop:`1px solid ${P.border}`}}>
           <div><div style={{fontSize:13,fontWeight:600,color:P.text}}>Pointage rapide</div><div style={{fontSize:11,color:P.sub,marginTop:2}}>Arrivée / Départ du jour</div></div>
           <button onClick={()=>setPr({...pr,pointageRapide:!pr.pointageRapide})} style={{width:51,height:31,borderRadius:16,border:"none",cursor:"pointer",position:"relative",background:pr.pointageRapide!==false?P.teal:P.dim,transition:"background .2s"}}><div style={{width:27,height:27,borderRadius:14,background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,.3)",position:"absolute",top:2,left:pr.pointageRapide!==false?22:2,transition:"left .2s"}}/></button>
@@ -690,9 +699,8 @@ window.MonReleve=function MonReleve(){
           <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
               <span style={{fontSize:12,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
-              {stats.length>0&&<div style={{fontSize:15,fontWeight:800,color:mDiff>0?P.teal:mDiff<0?P.orange:P.teal}}>{mDiff>0?`+${m2h(mDiff)}`:mDiff<0?`−${m2h(Math.abs(mDiff))}`:"À jour"}</div>}
+              {stats.length>0&&(()=>{const absD=Math.abs(mDiff);const col=mDiff<-15?P.orange:P.teal;const label=absD<=15?"À jour":mDiff>0?`En avance (+${m2h(mDiff)})`:`En retard (−${m2h(absD)})`;return<div style={{fontSize:13,fontWeight:700,color:col}}>{absD<=15?"✓":mDiff>0?"✓":"⚠"} {label}</div>;})()}
             </div>
-            {stats.length>0&&<div style={{fontSize:10,color:mDiff>0?P.teal:mDiff<0?P.orange:P.teal,marginBottom:8,fontWeight:500}}>{mDiff>0?"d'avance":mDiff<0?"restantes":""}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
               <div style={{fontSize:14,fontWeight:600,color:P.sub}}>{m2h(mTot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
               {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,padding:"4px 0"}}>Détail {detailMois?"▴":"›"}</button>}
@@ -917,7 +925,6 @@ const st={
   fg:{marginBottom:14},
   fl:{fontSize:12,fontWeight:500,color:P.sub,display:"block",marginBottom:6,letterSpacing:.3},
   fi:{width:"100%",padding:"12px 14px",fontSize:14,border:`1px solid ${P.border}`,borderRadius:14,outline:"none",background:"rgba(255,255,255,.04)",color:P.text,boxSizing:"border-box",transition:TR},
-  fs:{width:"100%",padding:"12px 14px",fontSize:14,border:`1px solid ${P.border}`,borderRadius:14,outline:"none",background:"rgba(255,255,255,.04)",color:P.text,boxSizing:"border-box",transition:TR},
   header:{background:"linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03))",backdropFilter:P.glassBlur,WebkitBackdropFilter:P.glassBlur,borderBottom:`1px solid ${P.glassBorder}`,padding:"14px 18px 12px"},
   gearBtn:{width:38,height:38,borderRadius:12,background:"rgba(255,255,255,.06)",border:`1px solid ${P.glassBorder}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:TR},
   wRow:{display:"flex",alignItems:"center",gap:6},
