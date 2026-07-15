@@ -322,7 +322,7 @@ window.MonReleve=function MonReleve(){
   };
   const restaurer=()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";inp.style.cssText="position:fixed;top:-9999px;left:-9999px;opacity:0";document.body.appendChild(inp);inp.onchange=e=>{const f=e.target.files[0];if(!f){document.body.removeChild(inp);return;}const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||typeof d!=="object"||!d.profile||typeof d.profile!=="object"||!Array.isArray(d.weeks))throw new Error("!");const pn=d.profile.nom||d.profile.name;if(!pn||typeof pn!=="string"||!pn.trim())throw new Error("!");const p={nom:pn.trim(),contrat:d.profile.contrat||"",entreprise:(d.profile.entreprise||d.profile.co||"").trim(),pointageRapide:d.profile.pointageRapide!==undefined?d.profile.pointageRapide:true,pauseMatinHeure:d.profile.pauseMatinHeure||D_PM_H,pauseMatinFin:d.profile.pauseMatinFin||D_PM_F,pauseMidiDebut:d.profile.pauseMidiDebut||D_PD_D,pauseMidiFin:d.profile.pauseMidiFin||D_PD_F};svProf(p);let imported=0;d.weeks.forEach(w=>{if(!w||typeof w!=="object")return;const c=w.cle||w.key;if(!c||typeof c!=="string"||!w.data)return;svSem(c,p.nom,w.data);imported++;});setPr(p);setOk(true);setRk(x=>x+1);recalcCounter(p.nom);flash(`Restauré ✓ (${imported} sem.)`)}catch{flash("Fichier invalide");}document.body.removeChild(inp);};r.onerror=()=>{flash("Erreur de lecture");document.body.removeChild(inp);};r.readAsText(f);};setTimeout(()=>inp.click(),100);};
 
-  const stats=useMemo(()=>ok?mStats(pr.nom,pr.contrat,sem.n,pr):[],[pr.nom,pr.contrat,ok,rk,ck,sem.n,pr.pauseMatinHeure,pr.pauseMatinFin,pr.pauseMidiDebut,pr.pauseMidiFin]);
+  const stats=useMemo(()=>ok?mStats(pr.nom,pr.contrat,sem.n,pr):[],[pr.nom,pr.contrat,ok,rk,ck,sem.n,tab,wd,pr.pauseMatinHeure,pr.pauseMatinFin,pr.pauseMidiDebut,pr.pauseMidiFin]);
   const mTot=stats.reduce((s,w)=>s+w.tot,0),mObj=stats.reduce((s,w)=>s+w.obj,0),mDiff=mTot-mObj;
   const mDays=stats.reduce((s,w)=>s+(w.daysIn||5),0);
   const mPct=mObj>0?Math.min(100,Math.round(mTot/mObj*100)):0;
@@ -691,7 +691,7 @@ window.MonReleve=function MonReleve(){
           <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
               <span style={{fontSize:12,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
-              {stats.length>0&&(()=>{const absD=Math.abs(mDiff);const col=mDiff<-15?P.orange:P.teal;const label=absD<=15?"À jour":mDiff>0?`En avance (+${m2h(mDiff)})`:`En retard (−${m2h(absD)})`;return<div style={{fontSize:13,fontWeight:700,color:col}}>{absD<=15?"✓":mDiff>0?"✓":"⚠"} {label}</div>;})()}
+              {stats.length>0&&(()=>{const absD=Math.abs(mDiff);const col=mDiff<-15?P.orange:P.teal;const label=absD<=15?"À jour":mDiff>0?m2h(mDiff)+" d'avance":m2h(absD)+" restantes";return<div style={{fontSize:13,fontWeight:700,color:col}}>{absD<=15?"✓ ":""}{label}</div>;})()}
             </div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
               <div style={{fontSize:14,fontWeight:600,color:P.sub}}>{m2h(mTot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
