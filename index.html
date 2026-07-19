@@ -888,23 +888,23 @@ window.MonReleve=function MonReleve(){
               <button onClick={()=>setPrivOpen(false)} style={{...st.sec,width:"100%",marginTop:16}}>Fermer</button>
             </div>
           </div>}
-
-          {/* Popup mise à jour (une seule fois) */}
-          {updatePop&&<div style={{position:"fixed",inset:0,zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
-            <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%",textAlign:"center"}}>
-              <div style={{fontSize:32,marginBottom:8}}>🎉</div>
-              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:4}}>Mise à jour V{VERSION}</div>
-              <div style={{fontSize:12,color:P.sub,marginBottom:16,lineHeight:1.6}}>Mon Relevé a été mis à jour avec de nouvelles fonctionnalités.</div>
-              <button onClick={()=>{setUpdatePop(false);try{localStorage.setItem(`${PX}seen_v`,VERSION);}catch{};setTab("historique");setTimeout(()=>toggleAide("new"),300);}} style={{...st.cta,width:"100%",marginBottom:8}}>Voir les nouveautés</button>
-              <button onClick={()=>{setUpdatePop(false);try{localStorage.setItem(`${PX}seen_v`,VERSION);}catch{}}} style={{...st.sec,width:"100%"}}>Fermer</button>
-            </div>
-          </div>}
         </>)}
       </div>
 
       {tab==="heures"&&hasD&&!wd.valide&&<div style={st.fCTA}>
         {lun.getMonth()!==ven.getMonth()&&<button onClick={()=>{setPdfMois({m:lun.getMonth(),y:lun.getFullYear()});setPop(true);}} style={{...st.sec,width:"100%",marginBottom:8,fontSize:12}}>PDF clôture {MOIS[lun.getMonth()]}</button>}
         <button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button>
+      </div>}
+
+      {/* Popup mise à jour (une seule fois, tous onglets) */}
+      {updatePop&&<div style={{position:"fixed",inset:0,zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+        <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%",textAlign:"center"}}>
+          <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:4}}>Nouvelle mise à jour</div>
+          <div style={{fontSize:13,color:P.teal,fontWeight:600,marginBottom:12}}>Version {VERSION}</div>
+          <div style={{fontSize:12,color:P.sub,marginBottom:16,lineHeight:1.6}}>Mon Relevé a été mis à jour avec de nouvelles fonctionnalités.</div>
+          <button onClick={()=>{setUpdatePop(false);try{localStorage.setItem(`${PX}seen_v`,VERSION);}catch{};setTab("historique");setAideOpen(true);setAideSec(s=>({...s,new:true}));}} style={{...st.cta,width:"100%",marginBottom:8}}>Voir les nouveautés</button>
+          <button onClick={()=>{setUpdatePop(false);try{localStorage.setItem(`${PX}seen_v`,VERSION);}catch{}}} style={{...st.sec,width:"100%"}}>Fermer</button>
+        </div>
       </div>}
 
       {/* Tab bar with active green bg */}
