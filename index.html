@@ -256,6 +256,7 @@ window.MonReleve=function MonReleve(){
   const[privOpen,setPrivOpen]=useState(false);
   const[savOpen,setSavOpen]=useState(false);
   const[pdfMois,setPdfMois]=useState(null);
+  const[updatePop,setUpdatePop]=useState(()=>{try{const seen=localStorage.getItem(`${PX}seen_v`);return seen!==VERSION;}catch{return false;}});
   const[lastBackup,setLastBackup]=useState(()=>{try{return localStorage.getItem(`${PX}last_backup`)||null;}catch{return null;}});
 
   const{s:sem,l:lun}=semOff(off);
@@ -652,11 +653,14 @@ window.MonReleve=function MonReleve(){
 
         {/* ── TAB ABSENCES ── */}
         {tab==="absences"&&(<>
-          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
-            <p style={{fontSize:12,color:P.sub,flex:1,margin:0}}>Sélectionnez les jours d'absence.</p>
-            {!wd.valide&&<button onClick={()=>{const nj=wd.jours.map(j=>({...j,absence:true,motif:"Congé payé",demiJournee:false,arrivee:"",depart:""}));sv({...wd,jours:nj});flash("Semaine CP complète");}} style={{...st.sec,fontSize:10,padding:"6px 10px",whiteSpace:"nowrap"}}>Semaine CP</button>}
-          </div>
-          {wd.jours.map((j,i)=>(<div key={i} style={{...st.dc,padding:"12px 14px"}}>
+          {wd.valide?<div style={{...GL,borderRadius:16,padding:"14px 16px",marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:600,color:P.teal}}>✓ Semaine validée</div>
+            <div style={{fontSize:10,color:P.sub,marginTop:2}}>Les absences sont verrouillées avec le relevé.</div>
+          </div>:<>
+            <button onClick={()=>{const nj=wd.jours.map(j=>({...j,absence:true,motif:"Congé payé",demiJournee:false,arrivee:"",depart:""}));sv({...wd,jours:nj});flash("Semaine CP complète");}} style={{...st.cta,width:"100%",marginBottom:12,background:"linear-gradient(135deg,#059669,#2DD4A8)",fontSize:14,fontWeight:700}}>Semaine complète de CP</button>
+            <p style={{fontSize:12,color:P.sub,marginBottom:12}}>Ou sélectionnez les jours individuellement :</p>
+          </>}
+          {wd.jours.map((j,i)=>(<div key={i} style={{...st.dc,padding:"12px 14px",opacity:wd.valide?.6:1,pointerEvents:wd.valide?"none":"auto"}}>
             <label style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
               <input type="checkbox" checked={j.absence} onChange={e=>mj(i,"absence",e.target.checked)} style={{width:20,height:20,accentColor:P.teal,flexShrink:0}}/>
               <span style={{fontWeight:600,fontSize:14,color:P.text}}>{JOURS[i]}</span>
@@ -777,17 +781,15 @@ window.MonReleve=function MonReleve(){
                   <div style={{color:P.orange,fontWeight:600}}>Seul le relevé validé et transmis à l'employeur fait foi.</div>
                 </>},
                 {id:"abs",t:"Absences & demi-journées",c:<>
-                  <div style={{marginBottom:6}}>Activez "Absence" sur le jour concerné, choisissez le motif et sélectionnez journée complète ou demi-journée.</div>
-                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Motifs disponibles</div>
-                  <div style={{marginBottom:4}}>Congé payé · Jour férié · Maladie · Sans solde · Autre (texte libre).</div>
+                  <div style={{marginBottom:6}}>Activez "Absence" sur le jour concerné, ou utilisez le bouton "Semaine complète de CP" pour marquer les 5 jours d'un tap.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
-                    <span style={{fontWeight:600,color:P.teal}}>Comment ça marche</span><br/>
-                    <span style={{fontSize:11}}>Toute absence réduit l'objectif de la semaine. Seules les heures réellement travaillées sont comptées. Aucune heure fictive n'est ajoutée au compteur.</span></div>
+                    <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
+                    <span style={{fontSize:11}}>Toute absence réduit l'objectif. Seules les heures travaillées comptent. L'onglet Absences est verrouillé après validation.</span></div>
                   <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Demi-journée</div>
-                  <div style={{marginBottom:4}}>Saisissez les horaires de la demi-journée travaillée (arrivée/départ). L'autre demi-journée est couverte par l'absence.</div>
+                  <div style={{marginBottom:4}}>Saisissez les horaires de la demi-journée travaillée. L'autre demi-journée est couverte par l'absence.</div>
                   <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
-                    <span style={{fontWeight:600,color:P.muted}}>Valorisation CYFAC (PDF uniquement)</span><br/>
-                    <span style={{fontSize:11}}>CP et Férié : 7h48 / 3h54 (39h) · 7h / 3h30 (35h). Conforme à la règle CYFAC (semaine CP = 39h ou 35h).</span></div>
+                    <span style={{fontWeight:600,color:P.muted}}>Valorisation CYFAC (PDF)</span><br/>
+                    <span style={{fontSize:11}}>CP/Férié : 8h/jour · 4h/demi-journée (39h) · 7h/3h30 (35h). Semaine complète : 39h ou 35h (plafonnée). Informatif pour la comptabilité.</span></div>
                 </>},
                 {id:"cpt",t:"Compteur de report",c:<>
                   <div style={{marginBottom:4}}>L'écart entre vos heures travaillées et l'objectif ajusté est reporté d'une semaine à l'autre.</div>
@@ -815,7 +817,7 @@ window.MonReleve=function MonReleve(){
                   <div><button onClick={()=>setPrivOpen(true)} style={{background:"none",border:"none",color:P.teal,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Voir la notice complète ›</button></div>
                 </>},
                 {id:"new",t:"Nouveautés V2",c:<>
-                  {["Compteur de report automatique (±3h/semaine, ±6h cumul)","Demi-journées d'absence","Verrouillage et déverrouillage des relevés","Semaines à cheval gérées dans les statistiques","PDF partiels pour clôture de mois","Moteur unique : seules les heures réelles comptent","Valorisation CYFAC informative sur le PDF","Notice utilisateur et confidentialité RGPD","Guide structuré avec sections repliables"].map((item,i)=>(
+                  {["Compteur de report automatique (±3h/semaine, ±6h cumul)","Demi-journées d'absence","Bouton semaine complète de CP","Valorisation CYFAC conforme (8h/jour, 39h/semaine)","PDF partiels pour clôture de mois","Semaines à cheval gérées dans les statistiques","Moteur unique : seules les heures réelles comptent","Verrouillage des relevés et des absences","Guide structuré avec sections repliables","Notice confidentialité RGPD intégrée"].map((item,i)=>(
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",lineHeight:1.6}}><span style={{color:P.teal,flexShrink:0}}>✓</span><span>{item}</span></div>
                   ))}
                 </>}
@@ -884,6 +886,17 @@ window.MonReleve=function MonReleve(){
                 <div style={{marginBottom:4}}>Les données sont conservées sur votre appareil tant que vous ne les supprimez pas. Il est recommandé de conserver les relevés au minimum 3 ans (prescription légale en matière de durée du travail, art. L.3245-1 du Code du travail).</div>
               </div>
               <button onClick={()=>setPrivOpen(false)} style={{...st.sec,width:"100%",marginTop:16}}>Fermer</button>
+            </div>
+          </div>}
+
+          {/* Popup mise à jour (une seule fois) */}
+          {updatePop&&<div style={{position:"fixed",inset:0,zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+            <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%",textAlign:"center"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🎉</div>
+              <div style={{fontSize:18,fontWeight:800,color:P.text,marginBottom:4}}>Mise à jour V{VERSION}</div>
+              <div style={{fontSize:12,color:P.sub,marginBottom:16,lineHeight:1.6}}>Mon Relevé a été mis à jour avec de nouvelles fonctionnalités.</div>
+              <button onClick={()=>{setUpdatePop(false);try{localStorage.setItem(`${PX}seen_v`,VERSION);}catch{};setTab("historique");setTimeout(()=>toggleAide("new"),300);}} style={{...st.cta,width:"100%",marginBottom:8}}>Voir les nouveautés</button>
+              <button onClick={()=>{setUpdatePop(false);try{localStorage.setItem(`${PX}seen_v`,VERSION);}catch{}}} style={{...st.sec,width:"100%"}}>Fermer</button>
             </div>
           </div>}
         </>)}
