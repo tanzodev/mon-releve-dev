@@ -50,10 +50,10 @@ const VERSION = "2.0";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
-function objJour(ct){return ct==="CDI — 39h"?468:420;} // objectif journalier travaillé : 7h48 ou 7h
-function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // valorisation CYFAC : 8h ou 7h (PDF uniquement)
+function objJour(ct){return ct==="CDI — 39h"?468:420;} // 7h48 ou 7h — temps contractuel journalier
+function absAffJour(ct){return ct==="CDI — 39h"?480:420;} // valorisation CYFAC PDF : 8h ou 7h
 function calcReport(jours,contrat,cfg){
-  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvAbs=absAffJour(contrat);
+  const objM=(H_OBJ[contrat]||DEF_OBJ)*60;const dv=objJour(contrat);const dvP=absAffJour(contrat);
   let travaille=0,neutre=0,valorisePDF=0;
   jours.forEach(j=>{
     if(!j.absence){travaille+=cNet(j.arrivee,j.depart,cfg);}
@@ -61,9 +61,10 @@ function calcReport(jours,contrat,cfg){
       const mult=j.demiJournee?0.5:1;
       if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
       neutre+=Math.round(dv*mult);
-      if(MOTIFS_VALORISES.includes(j.motif)){valorisePDF+=Math.round(dvAbs*mult);}
+      if(MOTIFS_VALORISES.includes(j.motif)){valorisePDF+=Math.round(dvP*mult);}
     }
   });
+  if(valorisePDF>objM)valorisePDF=objM;
   const objAjuste=objM-neutre;const total=travaille;const ecart=total-objAjuste;
   return{travaille,valorise:0,neutre,objAjuste,total,ecart,valorisePDF};
 }
@@ -375,7 +376,7 @@ window.MonReleve=function MonReleve(){
         <div style={{display:"flex",justifyContent:"space-between",background:"#EFF6FF",margin:"4px -14px 0",padding:"10px 14px",borderBottom:`2px solid #1E40AF`}}>
           <span style={{fontSize:11,fontWeight:800,color:"#1E40AF"}}>TOTAL RELEVÉ (valorisation RH)</span><span style={{fontSize:16,fontWeight:800,color:"#1E40AF"}}>{m2h(totalRH)}</span>
         </div>
-        {vp>0&&<div style={{fontSize:8,color:pk.muted,padding:"4px 0",fontStyle:"italic"}}>La valorisation CYFAC (CP/Férié = {pr.contrat==="CDI — 39h"?"8h":"7h"}/jour) est informative. Le compteur ci-dessous utilise le temps contractuel ({pr.contrat==="CDI — 39h"?"7h48":"7h"}/jour).</div>}
+        {vp>0&&<div style={{fontSize:8,color:pk.muted,padding:"4px 0",fontStyle:"italic"}}>Valorisation CP/Férié : {pr.contrat==="CDI — 39h"?"7h48":"7h"}/jour ({pr.contrat==="CDI — 39h"?"39h":"35h"}/semaine, règle CYFAC).</div>}
         <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid #DBEAFE`}}>
           <div style={{fontWeight:700,marginBottom:6,color:"#1E40AF",fontSize:10}}>Compteur de report (temps contractuel)</div>
           <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}><span style={{fontSize:9,color:pk.muted}}>Objectif contractuel</span><span style={{fontSize:9,color:pk.muted}}>{m2h(objC)}</span></div>
@@ -651,7 +652,10 @@ window.MonReleve=function MonReleve(){
 
         {/* ── TAB ABSENCES ── */}
         {tab==="absences"&&(<>
-          <p style={{fontSize:12,color:P.sub,marginBottom:12}}>Sélectionnez les jours d'absence.</p>
+          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
+            <p style={{fontSize:12,color:P.sub,flex:1,margin:0}}>Sélectionnez les jours d'absence.</p>
+            {!wd.valide&&<button onClick={()=>{const nj=wd.jours.map(j=>({...j,absence:true,motif:"Congé payé",demiJournee:false,arrivee:"",depart:""}));sv({...wd,jours:nj});flash("Semaine CP complète");}} style={{...st.sec,fontSize:10,padding:"6px 10px",whiteSpace:"nowrap"}}>Semaine CP</button>}
+          </div>
           {wd.jours.map((j,i)=>(<div key={i} style={{...st.dc,padding:"12px 14px"}}>
             <label style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
               <input type="checkbox" checked={j.absence} onChange={e=>mj(i,"absence",e.target.checked)} style={{width:20,height:20,accentColor:P.teal,flexShrink:0}}/>
@@ -783,7 +787,7 @@ window.MonReleve=function MonReleve(){
                   <div style={{marginBottom:4}}>Saisissez les horaires de la demi-journée travaillée (arrivée/départ). L'autre demi-journée est couverte par l'absence.</div>
                   <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
                     <span style={{fontWeight:600,color:P.muted}}>Valorisation CYFAC (PDF uniquement)</span><br/>
-                    <span style={{fontSize:11}}>Les CP et jours fériés sont mentionnés sur le PDF à leur valeur CYFAC (8h/4h pour un 39h · 7h/3h30 pour un 35h). Cette mention est purement informative pour la comptabilité. Le compteur interne utilise le temps contractuel (7h48 ou 7h par jour).</span></div>
+                    <span style={{fontSize:11}}>CP et Férié : 7h48 / 3h54 (39h) · 7h / 3h30 (35h). Conforme à la règle CYFAC (semaine CP = 39h ou 35h).</span></div>
                 </>},
                 {id:"cpt",t:"Compteur de report",c:<>
                   <div style={{marginBottom:4}}>L'écart entre vos heures travaillées et l'objectif ajusté est reporté d'une semaine à l'autre.</div>

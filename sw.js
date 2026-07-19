@@ -4,7 +4,7 @@
  */
 
 const APP_VERSION = '2.1';
-const CACHE_CORE = 'mr-core-v2.3.6';
+const CACHE_CORE = 'mr-core-v2.4.0';
 const CACHE_CDN = 'mr-cdn-v1';
 
 const CORE_ASSETS = ['./', './index.html', './manifest.json', './icon-512.png', './icon-192.png', './icon-180.png'];
