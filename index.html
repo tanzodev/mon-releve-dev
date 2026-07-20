@@ -42,11 +42,11 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /*
  * ╔═══════════════════════════════════════════════╗
- * ║  MON RELEVÉ — v2.4                            ║
+ * ║  MON RELEVÉ — v2.5                            ║
  * ║  Compteur report · PDF · Absences valorisées  ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.4";
+const VERSION = "2.5";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
@@ -60,7 +60,7 @@ function calcReport(jours,contrat,cfg){
     else{
       const mult=j.demiJournee?0.5:1;
       if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
-      neutre+=Math.round(dv*mult);
+      if(j.motif!=="Repos")neutre+=Math.round(dv*mult);
       if(MOTIFS_VALORISES.includes(j.motif)){valorisePDF+=Math.round(dvP*mult);}
     }
   });
@@ -73,7 +73,7 @@ function calcReport(jours,contrat,cfg){
 const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
 const D_PM_H = "10:00", D_PM_F = "10:15", D_PD_D = "12:30", D_PD_F = "13:15";
 const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
-const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Autre"];
+const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Repos","Autre"];
 const CONTRATS = ["CDI — 35h","CDI — 39h"];
 const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39};
 const MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -160,7 +160,7 @@ function mStats(n,ct,semNum,cfg){
         absCount+=mult;
         const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
         if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
-        neutreM+=Math.round(dv*mult);
+        if(j.motif!=="Repos")neutreM+=Math.round(dv*mult);
       }else{tot+=cNet(j.arrivee,j.depart,cfg);}
     });
     if(daysIn===0)return;
@@ -785,6 +785,8 @@ window.MonReleve=function MonReleve(){
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
                     <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
                     <span style={{fontSize:11}}>Toute absence réduit l'objectif. Seules les heures travaillées comptent. L'onglet Absences est verrouillé après validation.</span></div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Jour de repos</div>
+                  <div style={{marginBottom:4}}>Pour les semaines de 4 ou 4,5 jours, ou les vendredis alternés : marquez le jour non travaillé comme "Repos". L'objectif hebdomadaire reste inchangé — vous réalisez vos heures sur les jours travaillés.</div>
                   <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Demi-journée</div>
                   <div style={{marginBottom:4}}>Saisissez les horaires de la demi-journée travaillée. L'autre demi-journée est couverte par l'absence.</div>
                   <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
@@ -817,7 +819,7 @@ window.MonReleve=function MonReleve(){
                   <div><button onClick={()=>setPrivOpen(true)} style={{background:"none",border:"none",color:P.teal,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Voir la notice complète ›</button></div>
                 </>},
                 {id:"new",t:"Nouveautés V2",c:<>
-                  {["Compteur de report automatique (±3h/semaine, ±6h cumul)","Demi-journées d'absence","Bouton semaine complète de CP","Valorisation CYFAC conforme (8h/jour, 39h/semaine)","PDF partiels pour clôture de mois","Semaines à cheval gérées dans les statistiques","Moteur unique : seules les heures réelles comptent","Verrouillage des relevés et des absences","Guide structuré avec sections repliables","Notice confidentialité RGPD intégrée"].map((item,i)=>(
+                  {["Compteur de report automatique (±3h/semaine, ±6h cumul)","Demi-journées d'absence","Jour de repos (semaines 4j, 4.5j, alternance)","Bouton semaine complète de CP","Valorisation CYFAC conforme (8h/jour, 39h/semaine)","PDF partiels pour clôture de mois","Semaines à cheval gérées dans les statistiques","Moteur unique : seules les heures réelles comptent","Verrouillage des relevés et des absences","Guide structuré et confidentialité RGPD"].map((item,i)=>(
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",lineHeight:1.6}}><span style={{color:P.teal,flexShrink:0}}>✓</span><span>{item}</span></div>
                   ))}
                 </>}
