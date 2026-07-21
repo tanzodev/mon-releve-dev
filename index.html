@@ -42,11 +42,11 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /*
  * ╔═══════════════════════════════════════════════╗
- * ║  MON RELEVÉ — v2.5.3                            ║
+ * ║  MON RELEVÉ — v2.5.4                            ║
  * ║  Compteur report · PDF · Absences valorisées  ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.5.3";
+const VERSION = "2.5.4";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
@@ -60,7 +60,7 @@ function calcReport(jours,contrat,cfg){
     else{
       const mult=j.demiJournee?0.5:1;
       if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
-      if(j.motif!=="Repos")neutre+=Math.round(dv*mult);
+      if(j.motif!=="Jour Off")neutre+=Math.round(dv*mult);
       if(MOTIFS_VALORISES.includes(j.motif)){valorisePDF+=Math.round(dvP*mult);}
     }
   });
@@ -73,7 +73,7 @@ function calcReport(jours,contrat,cfg){
 const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
 const D_PM_H = "10:00", D_PM_F = "10:15", D_PD_D = "12:30", D_PD_F = "13:15";
 const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
-const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Repos","Autre"];
+const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Jour Off","Autre"];
 const CONTRATS = ["CDI — 35h","CDI — 39h"];
 const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39};
 const MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -130,8 +130,8 @@ function recalcCounter(n){
   const weeks=allSem(n).filter(w=>w.data&&w.data.valide&&w.cle>=debut).sort((a,b)=>a.cle.localeCompare(b.cle));
   let cnt=0;
   weeks.forEach(w=>{
-    // Migration: convertir ½ Repos en journée normale
-    w.data.jours.forEach(j=>{if(j.absence&&j.motif==="Repos"&&j.demiJournee){j.absence=false;j.motif="";j.demiJournee=false;}});
+    // Migration: Repos→Jour Off + convertir ½ Jour Off en journée normale
+    w.data.jours.forEach(j=>{if(j.motif==="Repos")j.motif="Jour Off";if(j.absence&&j.motif==="Jour Off"&&j.demiJournee){j.absence=false;j.motif="";j.demiJournee=false;}});
     const rpt=calcReport(w.data.jours,cfg.contrat,cfg);
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+reportable));
@@ -236,6 +236,8 @@ window.MonReleve=function MonReleve(){
   const[pr,setPr]=useState(ldProf);
   const[ok,setOk]=useState(()=>{const p=ldProf();return!!(p.nom&&p.entreprise);});
   const[ed,setEd]=useState(false);
+  const[origPr,setOrigPr]=useState(null);
+  const[confirmPop,setConfirmPop]=useState(null);
   const[off,setOff]=useState(0);
   const[wd,setWd]=useState(null);
   const[tab,setTab]=useState("heures");
@@ -270,7 +272,7 @@ window.MonReleve=function MonReleve(){
   const toastRef=useRef(null);
   const flash=m=>{setMsg(m);if(toastRef.current)clearTimeout(toastRef.current);toastRef.current=setTimeout(()=>setMsg(""),TOAST_MS);};
   useEffect(()=>()=>{if(toastRef.current)clearTimeout(toastRef.current);},[]);
-  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";u.demiJournee=false;}if(f==="motif"&&v==="Repos"){u.demiJournee=false;}return u;});sv({...wd,jours:nj});};
+  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";u.demiJournee=false;}if(f==="motif"&&v==="Jour Off"){u.demiJournee=false;}return u;});sv({...wd,jours:nj});};
   const pointer=(i,f)=>{mj(i,f,hNow());flash(`${f==="arrivee"?"Arrivée":"Départ"} ${hNow()}`);};
   const valider=()=>{
     if(!wd)return;
@@ -459,8 +461,19 @@ window.MonReleve=function MonReleve(){
           })()}
         </div>
       </div>
-      <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}const oldP=ldProf();if(ok&&oldP.nom&&oldP.nom!==pr.nom.trim()&&!confirm("⚠️ Modifier le nom créera un nouveau profil.\nL'historique existant sous \""+oldP.nom+"\" ne sera pas transféré.\n\nContinuer ?"))return;if(ok&&oldP.contrat&&oldP.contrat!==pr.contrat&&!confirm("⚠️ Modifier le contrat recalculera l'ensemble du compteur historique.\n\nContinuer ?"))return;if(ok&&(oldP.pauseMatinHeure!==pr.pauseMatinHeure||oldP.pauseMatinFin!==pr.pauseMatinFin||oldP.pauseMidiDebut!==pr.pauseMidiDebut||oldP.pauseMidiFin!==pr.pauseMidiFin)&&!confirm("⚠️ Modifier les pauses recalculera l'ensemble du compteur historique.\n\nContinuer ?"))return;svProf(pr);setOk(true);setEd(false);recalcCounter(pr.nom);setRk(x=>x+1);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
-      {ok&&<button onClick={()=>setEd(false)} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
+      <button onClick={()=>{
+        if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}
+        const oldP=origPr||ldProf();
+        const changes=[];
+        if(ok&&oldP.nom&&oldP.nom!==pr.nom.trim())changes.push({title:"Modification du nom",text:"Changer le nom créera un nouveau profil.\nL'historique existant sous \""+oldP.nom+"\" ne sera pas transféré."});
+        if(ok&&oldP.contrat&&oldP.contrat!==pr.contrat)changes.push({title:"Modification du contrat",text:"Changer le contrat recalculera l'ensemble du compteur de report.\nCette opération peut modifier l'historique calculé."});
+        if(ok&&(oldP.pauseMatinHeure!==pr.pauseMatinHeure||oldP.pauseMatinFin!==pr.pauseMatinFin||oldP.pauseMidiDebut!==pr.pauseMidiDebut||oldP.pauseMidiFin!==pr.pauseMidiFin))changes.push({title:"Modification des pauses",text:"Modifier les pauses recalculera les semaines déjà enregistrées."});
+        if(ok&&oldP.entreprise&&oldP.entreprise!==pr.entreprise.trim()&&changes.length===0)changes.push({title:"Modification de l'entreprise",text:"Cette modification affectera les futurs relevés PDF."});
+        const doSave=()=>{svProf(pr);setOk(true);setEd(false);setOrigPr(null);recalcCounter(pr.nom);setRk(x=>x+1);flash("Enregistré ✓");};
+        if(changes.length>0){setConfirmPop({title:"⚠️ "+changes[0].title,text:changes[0].text,onConfirm:doSave});}
+        else{doSave();}
+      }} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
+      {ok&&<button onClick={()=>{if(origPr)setPr(origPr);setOrigPr(null);setEd(false);}} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
       {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
       <div style={{fontSize:10,color:P.dim,marginTop:12,textAlign:"center"}}>v{VERSION}</div>
     </div></div>);
@@ -521,7 +534,7 @@ window.MonReleve=function MonReleve(){
             <div style={{fontSize:14,color:P.sub,fontWeight:500}}>{salut()}</div>
             <div style={{fontSize:22,fontWeight:800,color:P.text,marginTop:1}}>{prenom}</div>
           </div>
-          <button onClick={()=>setEd(true)} style={st.gearBtn}><IGear/></button>
+          <button onClick={()=>{setOrigPr({...pr});setEd(true);}} style={st.gearBtn}><IGear/></button>
         </div>
         <div style={{background:P.card,borderRadius:12,padding:"8px 4px",border:`1px solid ${P.border}`}}>
           <div style={st.wRow}>
@@ -668,7 +681,7 @@ window.MonReleve=function MonReleve(){
             </label>
             {j.absence&&(<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>mj(i,"motif",m)} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
-              {j.motif&&j.motif!=="Repos"&&<div style={{display:"flex",gap:8,marginTop:10}}>{[{l:"Journée",v:false},{l:"Demi-journée",v:true}].map(o=><button key={o.l} onClick={()=>mj(i,"demiJournee",o.v)} style={{...st.mP,flex:1,...(j.demiJournee===o.v?{background:P.teal,color:P.bg}:{})}}>{o.l}</button>)}</div>}
+              {j.motif&&j.motif!=="Jour Off"&&<div style={{display:"flex",gap:8,marginTop:10}}>{[{l:"Journée",v:false},{l:"Demi-journée",v:true}].map(o=><button key={o.l} onClick={()=>mj(i,"demiJournee",o.v)} style={{...st.mP,flex:1,...(j.demiJournee===o.v?{background:P.teal,color:P.bg}:{})}}>{o.l}</button>)}</div>}
               {j.motif==="Autre"&&<input type="text" placeholder="Précisez…" value={j.motifAutre} onChange={e=>mj(i,"motifAutre",e.target.value)} style={{...st.fi,marginTop:8,padding:"10px 14px",fontSize:13}}/>}
             </div>)}
           </div>))}
@@ -774,8 +787,8 @@ window.MonReleve=function MonReleve(){
                 </>},
                 {id:"abs",t:"Absences & demi-journées",c:<>
                   <div style={{marginBottom:6}}>Activez "Absence" sur le jour concerné, ou utilisez le bouton "Semaine complète de CP" pour marquer les 5 jours d'un tap.</div>
-                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Jour de repos</div>
-                  <div style={{marginBottom:4}}>Pour les semaines de 4 ou 4,5 jours : marquez le jour non travaillé comme "Repos" (journée complète uniquement). L'objectif hebdomadaire reste inchangé — vous réalisez vos heures sur les jours travaillés. Un départ anticipé (ex: vendredi midi) ne nécessite pas de déclarer une absence.</div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Jour Off</div>
+                  <div style={{marginBottom:4}}>Pour les semaines de 4 ou 4,5 jours : marquez le jour non travaillé comme "Jour Off" (journée complète uniquement). L'objectif hebdomadaire reste inchangé — vous réalisez vos heures sur les jours travaillés. Un départ anticipé (ex: vendredi midi) ne nécessite pas de déclarer une absence.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
                     <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
                     <span style={{fontSize:11}}>Toute absence (sauf Repos) réduit l'objectif. Seules les heures travaillées comptent. L'onglet Absences est verrouillé après validation.</span></div>
@@ -809,7 +822,7 @@ window.MonReleve=function MonReleve(){
                   <div><button onClick={()=>setPrivOpen(true)} style={{background:"none",border:"none",color:P.teal,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Voir la notice complète ›</button></div>
                 </>},
                 {id:"new",t:"Nouveautés V2.5",c:<>
-                  {["Jour de repos (semaines 4j, 4.5j, alternance)","Synthèse mensuelle simplifiée (activité uniquement)","Compteur de report comme référence unique des écarts"].map((item,i)=>(
+                  {["Jour Off (semaines 4j, 4.5j, alternance)","Synthèse mensuelle simplifiée (activité uniquement)","Compteur de report comme référence unique des écarts"].map((item,i)=>(
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",lineHeight:1.6}}><span style={{color:P.teal,flexShrink:0}}>✓</span><span>{item}</span></div>
                   ))}
                 </>}
@@ -886,6 +899,16 @@ window.MonReleve=function MonReleve(){
       {tab==="heures"&&hasD&&!wd.valide&&<div style={st.fCTA}>
         {lun.getMonth()!==ven.getMonth()&&<button onClick={()=>{setPdfMois({m:lun.getMonth(),y:lun.getFullYear()});setPop(true);}} style={{...st.sec,width:"100%",marginBottom:8,fontSize:12}}>PDF clôture {MOIS[lun.getMonth()]}</button>}
         <button onClick={valider} style={{...st.cta,width:"100%"}}>Valider et envoyer</button>
+      </div>}
+
+      {/* Popup confirmation paramètres */}
+      {confirmPop&&<div style={{position:"fixed",inset:0,zIndex:220,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+        <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%",textAlign:"center"}}>
+          <div style={{fontSize:16,fontWeight:800,color:P.orange,marginBottom:8}}>{confirmPop.title}</div>
+          <div style={{fontSize:12,color:P.sub,marginBottom:16,lineHeight:1.6,whiteSpace:"pre-line"}}>{confirmPop.text}</div>
+          <button onClick={()=>{const fn=confirmPop.onConfirm;setConfirmPop(null);fn();}} style={{...st.cta,width:"100%",marginBottom:8}}>Continuer</button>
+          <button onClick={()=>{setConfirmPop(null);}} style={{...st.sec,width:"100%"}}>Annuler</button>
+        </div>
       </div>}
 
       {/* Popup mise à jour (une seule fois, tous onglets) */}
