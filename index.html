@@ -42,11 +42,11 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /*
  * ╔═══════════════════════════════════════════════╗
- * ║  MON RELEVÉ — v2.5.2                            ║
+ * ║  MON RELEVÉ — v2.5.3                            ║
  * ║  Compteur report · PDF · Absences valorisées  ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.5.2";
+const VERSION = "2.5.3";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
@@ -264,7 +264,7 @@ window.MonReleve=function MonReleve(){
 
   useEffect(()=>{if(ok&&pr.nom)setWd(ldSem(ck,pr.nom)||vide(sem));},[ck,pr.nom,ok,rk,sem.n,sem.y]);
   // Recalcule le compteur au chargement
-  useEffect(()=>{if(ok&&pr.nom)recalcCounter(pr.nom);},[ok,pr.nom]);
+  useEffect(()=>{if(ok&&pr.nom){recalcCounter(pr.nom);setRk(x=>x+1);}},[ok,pr.nom]);
 
   const sv=useCallback(d=>{setWd(d);svSem(ck,pr.nom,d);},[ck,pr.nom]);
   const toastRef=useRef(null);
@@ -282,18 +282,18 @@ window.MonReleve=function MonReleve(){
     const report={avant,ecart:rpt.ecart,applique,apres,travaille:rpt.travaille,valorise:0,neutre:rpt.neutre,objAjuste:rpt.objAjuste,valoPDF:rpt.valorisePDF};
     svCounter(apres);
     sv({...wd,valide:true,valideA:new Date().toISOString(),report});
-    setPop(true);flash("Semaine validée ✓");
+    setPop(true);setRk(x=>x+1);flash("Semaine validée ✓");
   };
   const deverrouiller=()=>{
     if(!wd||!wd.valide)return;
     sv({...wd,valide:false,valideA:null,report:null});
-    recalcCounter(pr.nom);
+    recalcCounter(pr.nom);setRk(x=>x+1);
     flash("Relevé déverrouillé");
   };
   const setNotes=v=>{if(!wd)return;sv({...wd,notes:v});};
 
-  const totMin=wd?wd.jours.reduce((s,j)=>j.absence?s:s+cNet(j.arrivee,j.depart,pr),0):0;
   const curReport=wd?calcReport(wd.jours,pr.contrat,pr):null;
+  const totMin=curReport?curReport.total:0;
   const hasD=wd&&wd.jours.some(j=>j.arrivee||j.depart||j.absence);
   const pct=curReport&&curReport.objAjuste>0?Math.min(100,Math.round(curReport.total/curReport.objAjuste*100)):0;
   const prenom=(pr.nom||"").split(" ")[0]||pr.nom;
@@ -447,7 +447,8 @@ window.MonReleve=function MonReleve(){
             const debutN=parseInt(curDebut.split("-S")[1]);
             const shiftDebut=(dir)=>{
               let ny=debutY,nn=debutN+dir;
-              if(nn<1){ny--;nn=52;}else if(nn>52){ny++;nn=1;}
+              const weeksInYear=(y)=>{const d=new Date(y,11,28);const s=getSem(d);return s.n>=52?s.n:52;};
+              if(nn<1){ny--;nn=weeksInYear(ny);}else if(nn>weeksInYear(ny)){ny++;nn=1;}
               setPr({...pr,compteurDebut:`${ny}-S${String(nn).padStart(2,"0")}`});
             };
             return<div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -458,7 +459,7 @@ window.MonReleve=function MonReleve(){
           })()}
         </div>
       </div>
-      <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}svProf(pr);setOk(true);setEd(false);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
+      <button onClick={()=>{if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}const oldP=ldProf();if(ok&&oldP.nom&&oldP.nom!==pr.nom.trim()&&!confirm("⚠️ Modifier le nom créera un nouveau profil.\nL'historique existant sous \""+oldP.nom+"\" ne sera pas transféré.\n\nContinuer ?"))return;if(ok&&oldP.contrat&&oldP.contrat!==pr.contrat&&!confirm("⚠️ Modifier le contrat recalculera l'ensemble du compteur historique.\n\nContinuer ?"))return;if(ok&&(oldP.pauseMatinHeure!==pr.pauseMatinHeure||oldP.pauseMatinFin!==pr.pauseMatinFin||oldP.pauseMidiDebut!==pr.pauseMidiDebut||oldP.pauseMidiFin!==pr.pauseMidiFin)&&!confirm("⚠️ Modifier les pauses recalculera l'ensemble du compteur historique.\n\nContinuer ?"))return;svProf(pr);setOk(true);setEd(false);recalcCounter(pr.nom);setRk(x=>x+1);flash("Enregistré ✓");}} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
       {ok&&<button onClick={()=>setEd(false)} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
       {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
       <div style={{fontSize:10,color:P.dim,marginTop:12,textAlign:"center"}}>v{VERSION}</div>
@@ -607,8 +608,8 @@ window.MonReleve=function MonReleve(){
                 {ok2&&<div style={{fontSize:11,color:P.sub,marginTop:4}}>Pause {m2h(cPause(j.arrivee,j.depart,pr))} · Net {m2h(n)}</div>}
               </div>);
             }
-            const n=cNet(j.arrivee,j.depart,pr);const isT=cur&&i===ti&&!isWeekend;const ok2=j.arrivee&&j.depart;
-            return(<div key={i} style={{...st.dc,...(isT&&!wd.valide?{border:`1.5px solid ${P.teal}`,boxShadow:`0 0 16px ${P.teal}15`}:{}),...(wd.valide?{opacity:.7}:{})}}>
+            const n=cNet(j.arrivee,j.depart,pr);const isT=cur&&i===ti&&!isWeekend;const ok2=j.arrivee&&j.depart;const incoherent=ok2&&t2m(j.depart)<=t2m(j.arrivee);
+            return(<div key={i} style={{...st.dc,...(isT&&!wd.valide?{border:`1.5px solid ${P.teal}`,boxShadow:`0 0 16px ${P.teal}15`}:{}),...(incoherent?{border:`1.5px solid ${P.red}`}:{}),...(wd.valide?{opacity:.7}:{})}}>
               <div style={st.dRow}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span style={st.dN}>{JOURS[i]}</span>
@@ -617,7 +618,8 @@ window.MonReleve=function MonReleve(){
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   {isT&&showQ&&!wd.valide&&!j.arrivee&&<button onClick={()=>pointer(i,"arrivee")} style={st.punchBtn}>↓</button>}
                   {isT&&showQ&&!wd.valide&&j.arrivee&&!j.depart&&<button onClick={()=>pointer(i,"depart")} style={{...st.punchBtn,borderColor:`${P.blue}40`}}>↑</button>}
-                  {ok2&&<span style={st.netP}>{m2h(n)}</span>}
+                  {ok2&&!incoherent&&<span style={st.netP}>{m2h(n)}</span>}
+                  {incoherent&&<span style={{fontSize:10,color:P.red,fontWeight:600}}>⚠ Horaires</span>}
                 </div>
               </div>
               {wd.valide?
@@ -633,7 +635,8 @@ window.MonReleve=function MonReleve(){
                   <TimeInput value={j.depart} onChange={v=>mj(i,"depart",v)} label="Départ"/>
                 </div>
               }
-              {ok2&&<div style={{fontSize:11,color:P.sub,marginTop:4}}>Pause {m2h(cPause(j.arrivee,j.depart,pr))} · Net {m2h(n)}</div>}
+              {ok2&&!incoherent&&<div style={{fontSize:11,color:P.sub,marginTop:4}}>Pause {m2h(cPause(j.arrivee,j.depart,pr))} · Net {m2h(n)}</div>}
+              {incoherent&&<div style={{fontSize:11,color:P.red,marginTop:4}}>⚠ Départ antérieur à l'arrivée</div>}
             </div>);
           })}
           <div style={{fontSize:11,color:P.muted,textAlign:"center",marginTop:4,marginBottom:4}}>Pauses : {pr.pauseMatinHeure||D_PM_H}–{pr.pauseMatinFin||D_PM_F} + {pr.pauseMidiDebut||D_PD_D}–{pr.pauseMidiFin||D_PD_F}</div>
