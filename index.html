@@ -270,7 +270,7 @@ window.MonReleve=function MonReleve(){
   const toastRef=useRef(null);
   const flash=m=>{setMsg(m);if(toastRef.current)clearTimeout(toastRef.current);toastRef.current=setTimeout(()=>setMsg(""),TOAST_MS);};
   useEffect(()=>()=>{if(toastRef.current)clearTimeout(toastRef.current);},[]);
-  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";u.demiJournee=false;}return u;});sv({...wd,jours:nj});};
+  const mj=(i,f,v)=>{if(!wd)return;const nj=wd.jours.map((j,k)=>{if(k!==i)return j;const u={...j,[f]:v};if(f==="absence"&&!v){u.motif="";u.motifAutre="";u.demiJournee=false;}if(f==="motif"&&v==="Repos"){u.demiJournee=false;}return u;});sv({...wd,jours:nj});};
   const pointer=(i,f)=>{mj(i,f,hNow());flash(`${f==="arrivee"?"Arrivée":"Départ"} ${hNow()}`);};
   const valider=()=>{
     if(!wd)return;
@@ -664,7 +664,7 @@ window.MonReleve=function MonReleve(){
               <span style={{fontWeight:600,fontSize:14,color:P.text}}>{JOURS[i]}</span>
             </label>
             {j.absence&&(<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>{mj(i,"motif",m);if(m==="Repos")mj(i,"demiJournee",false);}} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>mj(i,"motif",m)} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
               {j.motif&&j.motif!=="Repos"&&<div style={{display:"flex",gap:8,marginTop:10}}>{[{l:"Journée",v:false},{l:"Demi-journée",v:true}].map(o=><button key={o.l} onClick={()=>mj(i,"demiJournee",o.v)} style={{...st.mP,flex:1,...(j.demiJournee===o.v?{background:P.teal,color:P.bg}:{})}}>{o.l}</button>)}</div>}
               {j.motif==="Autre"&&<input type="text" placeholder="Précisez…" value={j.motifAutre} onChange={e=>mj(i,"motifAutre",e.target.value)} style={{...st.fi,marginTop:8,padding:"10px 14px",fontSize:13}}/>}
             </div>)}
