@@ -3,8 +3,8 @@
  * Offline-first · Auto-update · iOS PWA compatible
  */
 
-const APP_VERSION = '2.5';
-const CACHE_CORE = 'mr-core-v2.5.0';
+const APP_VERSION = '2.5.2';
+const CACHE_CORE = 'mr-core-v2.5.2';
 const CACHE_CDN = 'mr-cdn-v1';
 
 const CORE_ASSETS = ['./', './index.html', './manifest.json', './icon-512.png', './icon-192.png', './icon-180.png'];

@@ -42,11 +42,11 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /*
  * ╔═══════════════════════════════════════════════╗
- * ║  MON RELEVÉ — v2.5                            ║
+ * ║  MON RELEVÉ — v2.5.2                            ║
  * ║  Compteur report · PDF · Absences valorisées  ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.5";
+const VERSION = "2.5.2";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
@@ -130,6 +130,8 @@ function recalcCounter(n){
   const weeks=allSem(n).filter(w=>w.data&&w.data.valide&&w.cle>=debut).sort((a,b)=>a.cle.localeCompare(b.cle));
   let cnt=0;
   weeks.forEach(w=>{
+    // Migration: convertir ½ Repos en journée normale
+    w.data.jours.forEach(j=>{if(j.absence&&j.motif==="Repos"&&j.demiJournee){j.absence=false;j.motif="";j.demiJournee=false;}});
     const rpt=calcReport(w.data.jours,cfg.contrat,cfg);
     const reportable=Math.max(-REPORT_WEEK_CAP,Math.min(REPORT_WEEK_CAP,rpt.ecart));
     const apres=Math.max(-REPORT_GLOBAL_CAP,Math.min(REPORT_GLOBAL_CAP,cnt+reportable));
@@ -662,8 +664,8 @@ window.MonReleve=function MonReleve(){
               <span style={{fontWeight:600,fontSize:14,color:P.text}}>{JOURS[i]}</span>
             </label>
             {j.absence&&(<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${P.border}`}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>mj(i,"motif",m)} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
-              {j.motif&&<div style={{display:"flex",gap:8,marginTop:10}}>{[{l:"Journée",v:false},{l:"Demi-journée",v:true}].map(o=><button key={o.l} onClick={()=>mj(i,"demiJournee",o.v)} style={{...st.mP,flex:1,...(j.demiJournee===o.v?{background:P.teal,color:P.bg}:{})}}>{o.l}</button>)}</div>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{MOTIFS.map(m=><button key={m} onClick={()=>{mj(i,"motif",m);if(m==="Repos")mj(i,"demiJournee",false);}} style={{...st.mP,...(j.motif===m?{background:P.teal,color:P.bg}:{})}}>{m}</button>)}</div>
+              {j.motif&&j.motif!=="Repos"&&<div style={{display:"flex",gap:8,marginTop:10}}>{[{l:"Journée",v:false},{l:"Demi-journée",v:true}].map(o=><button key={o.l} onClick={()=>mj(i,"demiJournee",o.v)} style={{...st.mP,flex:1,...(j.demiJournee===o.v?{background:P.teal,color:P.bg}:{})}}>{o.l}</button>)}</div>}
               {j.motif==="Autre"&&<input type="text" placeholder="Précisez…" value={j.motifAutre} onChange={e=>mj(i,"motifAutre",e.target.value)} style={{...st.fi,marginTop:8,padding:"10px 14px",fontSize:13}}/>}
             </div>)}
           </div>))}
@@ -770,7 +772,7 @@ window.MonReleve=function MonReleve(){
                 {id:"abs",t:"Absences & demi-journées",c:<>
                   <div style={{marginBottom:6}}>Activez "Absence" sur le jour concerné, ou utilisez le bouton "Semaine complète de CP" pour marquer les 5 jours d'un tap.</div>
                   <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Jour de repos</div>
-                  <div style={{marginBottom:4}}>Pour les semaines de 4 ou 4,5 jours : marquez le jour non travaillé comme "Repos". L'objectif hebdomadaire reste inchangé — vous réalisez vos heures sur les jours travaillés.</div>
+                  <div style={{marginBottom:4}}>Pour les semaines de 4 ou 4,5 jours : marquez le jour non travaillé comme "Repos" (journée complète uniquement). L'objectif hebdomadaire reste inchangé — vous réalisez vos heures sur les jours travaillés. Un départ anticipé (ex: vendredi midi) ne nécessite pas de déclarer une absence.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
                     <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
                     <span style={{fontSize:11}}>Toute absence (sauf Repos) réduit l'objectif. Seules les heures travaillées comptent. L'onglet Absences est verrouillé après validation.</span></div>
