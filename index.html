@@ -42,11 +42,11 @@ const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 /*
  * ╔═══════════════════════════════════════════════╗
- * ║  MON RELEVÉ — v2.4                            ║
+ * ║  MON RELEVÉ — v2.5                            ║
  * ║  Compteur report · PDF · Absences valorisées  ║
  * ╚═══════════════════════════════════════════════╝
  */
-const VERSION = "2.4";
+const VERSION = "2.5";
 const REPORT_WEEK_CAP = 180; // ±3h en minutes
 const REPORT_GLOBAL_CAP = 360; // ±6h en minutes
 const MOTIFS_VALORISES = ["Congé payé","Férié"];
@@ -60,7 +60,7 @@ function calcReport(jours,contrat,cfg){
     else{
       const mult=j.demiJournee?0.5:1;
       if(j.demiJournee){travaille+=cNet(j.arrivee,j.depart,cfg);}
-      neutre+=Math.round(dv*mult);
+      if(j.motif!=="Repos")neutre+=Math.round(dv*mult);
       if(MOTIFS_VALORISES.includes(j.motif)){valorisePDF+=Math.round(dvP*mult);}
     }
   });
@@ -73,7 +73,7 @@ function calcReport(jours,contrat,cfg){
 const TOAST_MS = 2000, DL_MS = 1000, MS_DAY = 864e5, DEF_OBJ = 35;
 const D_PM_H = "10:00", D_PM_F = "10:15", D_PD_D = "12:30", D_PD_F = "13:15";
 const JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi"];
-const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Autre"];
+const MOTIFS = ["Congé payé","Férié","Maladie","Sans solde","Repos","Autre"];
 const CONTRATS = ["CDI — 35h","CDI — 39h"];
 const H_OBJ = {"CDI — 35h":35,"CDI — 39h":39};
 const MOIS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -146,11 +146,10 @@ function svProf(p){try{localStorage.setItem(`${PX}prof`,JSON.stringify(p));}catc
 function allSem(n){try{const pfx=`${PX}${n}_`;return Object.keys(localStorage).filter(k=>k.startsWith(pfx)).map(k=>{const c=k.slice(pfx.length);return{cle:c,data:ldSem(c,n)};}).filter(w=>w.data).sort((a,b)=>b.cle.localeCompare(a.cle));}catch{return[];}}
 function mStats(n,ct,semNum,cfg){
   const now=new Date();const mo=now.getMonth(),yr=now.getFullYear();
-  const dv=objJour(ct);
   const results=[];
   allSem(n).forEach(({cle,data})=>{
     const lun=getLunCle(cle);const num=parseInt(cle.split("-S")[1]);
-    let daysIn=0,tot=0,absCount=0,neutreM=0;const absMotifs={};
+    let daysIn=0,tot=0,absCount=0;const absMotifs={};
     data.jours.forEach((j,i)=>{
       const day=new Date(lun);day.setDate(day.getDate()+i);
       if(day.getMonth()!==mo||day.getFullYear()!==yr)return;
@@ -160,12 +159,10 @@ function mStats(n,ct,semNum,cfg){
         absCount+=mult;
         const m=j.motif==="Autre"?(j.motifAutre||"Autre"):(j.motif||"Non précisé");absMotifs[m]=(absMotifs[m]||0)+mult;
         if(j.demiJournee){tot+=cNet(j.arrivee,j.depart,cfg);}
-        neutreM+=Math.round(dv*mult);
       }else{tot+=cNet(j.arrivee,j.depart,cfg);}
     });
     if(daysIn===0)return;
-    const obj=Math.round(daysIn*dv)-neutreM;
-    results.push({num,tot,obj,diff:tot-obj,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
+    results.push({num,tot,v:!!data.valide,cur:num===semNum,absCount,absMotifs,daysIn});
   });
   return results.sort((a,b)=>a.num-b.num);
 }
@@ -325,9 +322,8 @@ window.MonReleve=function MonReleve(){
   const restaurer=()=>{const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";inp.style.cssText="position:fixed;top:-9999px;left:-9999px;opacity:0";document.body.appendChild(inp);inp.onchange=e=>{const f=e.target.files[0];if(!f){document.body.removeChild(inp);return;}const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d||typeof d!=="object"||!d.profile||typeof d.profile!=="object"||!Array.isArray(d.weeks))throw new Error("!");const pn=d.profile.nom||d.profile.name;if(!pn||typeof pn!=="string"||!pn.trim())throw new Error("!");const p={nom:pn.trim(),contrat:d.profile.contrat||"",entreprise:(d.profile.entreprise||d.profile.co||"").trim(),pointageRapide:d.profile.pointageRapide!==undefined?d.profile.pointageRapide:true,pauseMatinHeure:d.profile.pauseMatinHeure||D_PM_H,pauseMatinFin:d.profile.pauseMatinFin||D_PM_F,pauseMidiDebut:d.profile.pauseMidiDebut||D_PD_D,pauseMidiFin:d.profile.pauseMidiFin||D_PD_F};svProf(p);let imported=0;d.weeks.forEach(w=>{if(!w||typeof w!=="object")return;const c=w.cle||w.key;if(!c||typeof c!=="string"||!w.data)return;svSem(c,p.nom,w.data);imported++;});setPr(p);setOk(true);setRk(x=>x+1);recalcCounter(p.nom);flash(`Restauré ✓ (${imported} sem.)`)}catch{flash("Fichier invalide");}document.body.removeChild(inp);};r.onerror=()=>{flash("Erreur de lecture");document.body.removeChild(inp);};r.readAsText(f);};setTimeout(()=>inp.click(),100);};
 
   const stats=useMemo(()=>ok?mStats(pr.nom,pr.contrat,sem.n,pr):[],[pr.nom,pr.contrat,ok,rk,ck,sem.n,tab,wd,pr.pauseMatinHeure,pr.pauseMatinFin,pr.pauseMidiDebut,pr.pauseMidiFin]);
-  const mTot=stats.reduce((s,w)=>s+w.tot,0),mObj=stats.reduce((s,w)=>s+w.obj,0),mDiff=mTot-mObj;
+  const mTot=stats.reduce((s,w)=>s+w.tot,0);
   const mDays=stats.reduce((s,w)=>s+(w.daysIn||5),0);
-  const mPct=mObj>0?Math.min(100,Math.round(mTot/mObj*100)):0;
   const mAbsTotal=stats.reduce((s,w)=>s+w.absCount,0);
   const mAbsDetail=useMemo(()=>{const agg={};stats.forEach(w=>{Object.entries(w.absMotifs).forEach(([m,c])=>{agg[m]=(agg[m]||0)+c;});});return Object.entries(agg).sort((a,b)=>b[1]-a[1]);},[stats]);
   const archList=useMemo(()=>allSem(pr.nom),[pr.nom,rk,ck,tab,wd]);
@@ -559,7 +555,7 @@ window.MonReleve=function MonReleve(){
               :wd.valide?(<><div style={{width:6,height:6,borderRadius:3,background:P.teal}}/><span style={{fontSize:10,fontWeight:600,color:P.teal}}>Envoyé</span></>)
               :(<><div style={{width:6,height:6,borderRadius:3,background:P.orange}}/><span style={{fontSize:10,fontWeight:600,color:P.orange}}>Non envoyé</span></>)}
             </div>
-            {(()=>{const jc=wd.jours.filter(j=>!j.absence&&(j.arrivee||j.depart)).length;return<span style={{fontSize:9,color:P.dim}}>{jc} jour{jc>1?"s":""} saisis</span>;})()}
+            {(()=>{const jc=wd.jours.filter(j=>(!j.absence&&(j.arrivee||j.depart))||(j.absence&&j.demiJournee&&(j.arrivee||j.depart))).length;return<span style={{fontSize:9,color:P.dim}}>{jc} jour{jc>1?"s":""} saisis</span>;})()}
           </div>
         </div>
       </div>
@@ -695,29 +691,20 @@ window.MonReleve=function MonReleve(){
             </div>
           );})()}
 
-          {/* Mois en cours (toujours visible) */}
+          {/* Synthèse mensuelle (activité) */}
           <div style={{...GL,borderRadius:20,padding:"14px 18px",marginBottom:10}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
               <span style={{fontSize:12,fontWeight:700,color:P.text,textTransform:"uppercase",letterSpacing:.5}}>{MOIS[new Date().getMonth()]}</span>
-              {stats.length>0&&(()=>{const absD=Math.abs(mDiff);const col=mDiff<-15?P.orange:P.teal;const label=absD<=15?"À jour":mDiff>0?m2h(mDiff)+" d'avance":m2h(absD)+" restantes";return<div style={{fontSize:13,fontWeight:700,color:col}}>{absD<=15?"✓ ":""}{label}</div>;})()}
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-              <div style={{fontSize:14,fontWeight:600,color:P.sub}}>{m2h(mTot)} <span style={{fontWeight:400,color:P.muted}}>/ {m2h(mObj)}</span></div>
               {stats.length>0&&<button onClick={()=>setDetailMois(!detailMois)} style={{background:"none",border:"none",cursor:"pointer",color:P.teal,fontSize:11,fontWeight:600,padding:"4px 0"}}>Détail {detailMois?"▴":"›"}</button>}
             </div>
-            <div style={{marginTop:6,height:4,borderRadius:2,background:"rgba(255,255,255,.06)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:mPct>=100?P.teal:P.blue,width:`${mPct}%`,transition:"width .4s ease"}}/></div>
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:P.dim}}>{mPct}%</span><span style={{fontSize:9,color:P.dim}}>{mDays}j ouvrés</span></div>
-            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:9,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 7px",borderRadius:999}}>{count%1===0.5?(count===0.5?"½":(count-0.5)+"½"):count}j {motif}</div>))}</div>}
+            <div style={{fontSize:20,fontWeight:800,color:P.text}}>{m2h(mTot)} <span style={{fontSize:12,fontWeight:400,color:P.muted}}>enregistrées</span></div>
+            <div style={{fontSize:10,color:P.dim,marginTop:2}}>{mDays}j comptabilisés{stats.filter(w=>!w.v).length>0?` · ${stats.filter(w=>!w.v).length} sem. en cours`:""}</div>
+            {mAbsTotal>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{mAbsDetail.map(([motif,count])=>(<div key={motif} style={{fontSize:9,color:P.orange,background:"rgba(251,191,36,.06)",padding:"2px 7px",borderRadius:999}}>{count%1===0.5?(count===0.5?"½":(count-0.5)+"½"):count}j {motif}</div>))}</div>}
             {detailMois&&stats.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${P.border}`}}>
-              {stats.map((w,i)=>{const col=w.tot>=w.obj?P.teal:P.orange;const pc=w.obj>0?Math.min(100,Math.round(w.tot/w.obj*100)):0;
-                return(<div key={i} style={{marginBottom:i<stats.length-1?5:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:9,fontWeight:700,color:P.sub}}>S{w.num}</span>{w.daysIn&&w.daysIn<5&&<span style={{fontSize:8,color:P.dim}}>({w.daysIn}j)</span>}{w.v&&<ICheck size={8}/>}</div>
-                    <span style={{fontSize:9,fontWeight:600,color:P.muted}}>{m2h(w.tot)} <span style={{fontWeight:400,color:P.dim}}>/ {m2h(w.obj)}</span></span>
-                  </div>
-                  <div style={{height:2,borderRadius:1,background:P.card,overflow:"hidden"}}><div style={{height:"100%",borderRadius:1,background:col,width:`${pc}%`,transition:"width .4s"}}/></div>
-                </div>);
-              })}
+              {stats.map((w,i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:i<stats.length-1?`1px solid ${P.border}`:"none"}}>
+                <div style={{display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:9,fontWeight:700,color:P.sub}}>S{w.num}</span>{w.daysIn&&w.daysIn<5&&<span style={{fontSize:8,color:P.dim}}>({w.daysIn}j)</span>}{w.v&&<ICheck size={8}/>}</div>
+                <span style={{fontSize:10,fontWeight:600,color:P.text}}>{m2h(w.tot)}</span>
+              </div>))}
             </div>}
           </div>
 
@@ -782,29 +769,29 @@ window.MonReleve=function MonReleve(){
                 </>},
                 {id:"abs",t:"Absences & demi-journées",c:<>
                   <div style={{marginBottom:6}}>Activez "Absence" sur le jour concerné, ou utilisez le bouton "Semaine complète de CP" pour marquer les 5 jours d'un tap.</div>
+                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Jour de repos</div>
+                  <div style={{marginBottom:4}}>Pour les semaines de 4 ou 4,5 jours : marquez le jour non travaillé comme "Repos". L'objectif hebdomadaire reste inchangé — vous réalisez vos heures sur les jours travaillés.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:P.tealDim}}>
                     <span style={{fontWeight:600,color:P.teal}}>Fonctionnement</span><br/>
-                    <span style={{fontSize:11}}>Toute absence réduit l'objectif. Seules les heures travaillées comptent. L'onglet Absences est verrouillé après validation.</span></div>
+                    <span style={{fontSize:11}}>Toute absence (sauf Repos) réduit l'objectif. Seules les heures travaillées comptent. L'onglet Absences est verrouillé après validation.</span></div>
                   <div style={{marginBottom:4,fontWeight:600,color:P.text,marginTop:6}}>Demi-journée</div>
                   <div style={{marginBottom:4}}>Saisissez les horaires de la demi-journée travaillée. L'autre demi-journée est couverte par l'absence.</div>
                   <div style={{padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)"}}>
                     <span style={{fontWeight:600,color:P.muted}}>Valorisation CYFAC (PDF)</span><br/>
-                    <span style={{fontSize:11}}>CP/Férié : 8h/jour · 4h/demi-journée (39h) · 7h/3h30 (35h). Semaine complète : 39h ou 35h (plafonnée). Informatif pour la comptabilité.</span></div>
+                    <span style={{fontSize:11}}>CP/Férié : 8h/jour · 4h/demi-journée (39h) · 7h/3h30 (35h). Semaine complète : 39h ou 35h. Informatif pour la comptabilité.</span></div>
                 </>},
                 {id:"cpt",t:"Compteur de report",c:<>
-                  <div style={{marginBottom:4}}>L'écart entre vos heures travaillées et l'objectif ajusté est reporté d'une semaine à l'autre.</div>
+                  <div style={{marginBottom:4}}>Le compteur de report est la référence officielle. L'écart entre vos heures travaillées et l'objectif ajusté est reporté d'une semaine à l'autre.</div>
                   <div style={{marginBottom:4}}>Plafonds : ±3h par semaine, ±6h en cumul global.</div>
                   <div style={{marginBottom:4,padding:"8px 10px",borderRadius:10,background:"rgba(255,255,255,.04)",fontSize:11}}>
-                    <strong>Exemple (39h) :</strong> Semaine à 40h sans absence → objectif 39h → écart +1h → compteur passe de 0 à +1h.<br/>
-                    <strong>Avec 1 CP :</strong> 32h travaillées → objectif réduit à 31h12 (4 jours) → écart +0h48 → reporté au compteur.</div>
+                    <strong>Exemple (39h) :</strong> Semaine à 40h sans absence → objectif 39h → écart +1h → compteur passe de 0 à +1h.</div>
                   <div>Le compteur est recalculé automatiquement en cas de modification, suppression ou restauration d'un relevé.</div>
                 </>},
-                {id:"cheval",t:"Semaines à cheval",c:<>
-                  <div style={{marginBottom:4}}>Quand une semaine chevauche deux mois (ex: S27 = 29 juin – 3 juillet), l'application le gère automatiquement.</div>
-                  <div style={{marginBottom:4,fontWeight:600,color:P.text}}>Statistiques mensuelles</div>
-                  <div style={{marginBottom:4}}>Chaque jour est comptabilisé dans son mois réel. Les heures et l'objectif sont calculés jour par jour.</div>
+                {id:"cheval",t:"Semaines à cheval & suivi mensuel",c:<>
+                  <div style={{marginBottom:4}}>Quand une semaine chevauche deux mois, les heures de chaque jour sont comptabilisées dans leur mois réel.</div>
+                  <div style={{marginBottom:4}}>Le bloc mensuel affiche un résumé d'activité (heures enregistrées, jours comptabilisés). Le compteur de report reste la seule référence pour les écarts.</div>
                   <div style={{marginBottom:4,fontWeight:600,color:P.text}}>PDF partiels</div>
-                  <div>Pour l'envoi anticipé (clôture de mois), un bouton "PDF clôture" permet de générer un relevé partiel contenant uniquement les jours du mois concerné, sans attendre la fin de semaine.</div>
+                  <div>Pour la clôture de mois, un bouton "PDF clôture" génère un relevé partiel contenant uniquement les jours du mois concerné.</div>
                 </>},
                 {id:"sav",t:"Sauvegarde & restauration",c:<>
                   <div style={{marginBottom:4}}>Effectuez une sauvegarde régulière (minimum 1 fois par mois) depuis le tableau de bord. Le fichier JSON contient l'ensemble de vos données.</div>
@@ -816,8 +803,8 @@ window.MonReleve=function MonReleve(){
                   <div style={{marginBottom:4}}>Le motif "Maladie" (donnée de santé, art. 9 RGPD) est traité sur base légale. Seul le motif générique est enregistré, sans indication sur la pathologie.</div>
                   <div><button onClick={()=>setPrivOpen(true)} style={{background:"none",border:"none",color:P.teal,fontSize:12,fontWeight:600,cursor:"pointer",padding:0}}>Voir la notice complète ›</button></div>
                 </>},
-                {id:"new",t:"Nouveautés V2",c:<>
-                  {["Compteur de report automatique (±3h/semaine, ±6h cumul)","Demi-journées d'absence","Bouton semaine complète de CP","Valorisation CYFAC conforme (8h/jour, 39h/semaine)","PDF partiels pour clôture de mois","Semaines à cheval gérées dans les statistiques","Moteur unique : seules les heures réelles comptent","Verrouillage des relevés et des absences","Guide structuré avec sections repliables","Notice confidentialité RGPD intégrée"].map((item,i)=>(
+                {id:"new",t:"Nouveautés V2.5",c:<>
+                  {["Jour de repos (semaines 4j, 4.5j, alternance)","Synthèse mensuelle simplifiée (activité uniquement)","Compteur de report comme référence unique des écarts"].map((item,i)=>(
                     <div key={i} style={{display:"flex",gap:6,alignItems:"center",lineHeight:1.6}}><span style={{color:P.teal,flexShrink:0}}>✓</span><span>{item}</span></div>
                   ))}
                 </>}
