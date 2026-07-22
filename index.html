@@ -237,7 +237,7 @@ window.MonReleve=function MonReleve(){
   const[ok,setOk]=useState(()=>{const p=ldProf();return!!(p.nom&&p.entreprise);});
   const[ed,setEd]=useState(false);
   const[origPr,setOrigPr]=useState(null);
-  const[confirmPop,setConfirmPop]=useState(null);
+  const[confirmPop,setConfirmPop]=useState(false);
   const[off,setOff]=useState(0);
   const[wd,setWd]=useState(null);
   const[tab,setTab]=useState("heures");
@@ -472,6 +472,14 @@ window.MonReleve=function MonReleve(){
       {ok&&<button onClick={()=>{if(origPr)setPr(origPr);setOrigPr(null);setEd(false);}} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
       {!ok&&<button onClick={restaurer} style={{...st.sec,width:"100%",marginTop:10}}>Restaurer une sauvegarde</button>}
       <div style={{fontSize:10,color:P.dim,marginTop:12,textAlign:"center"}}>v{VERSION}</div>
+      {confirmPop&&<div style={{position:"fixed",inset:0,zIndex:220,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+        <div style={{...GL,borderRadius:28,padding:24,maxWidth:340,width:"100%",textAlign:"center"}}>
+          <div style={{fontSize:16,fontWeight:800,color:P.orange,marginBottom:8}}>{confirmPop.title}</div>
+          <div style={{fontSize:12,color:P.sub,marginBottom:16,lineHeight:1.6,whiteSpace:"pre-line"}}>{confirmPop.text}</div>
+          <button onClick={()=>{const fn=confirmPop.onConfirm;setConfirmPop(null);fn();}} style={{...st.cta,width:"100%",marginBottom:8}}>Continuer</button>
+          <button onClick={()=>setConfirmPop(null)} style={{...st.sec,width:"100%"}}>Annuler</button>
+        </div>
+      </div>}
     </div></div>);
   }
 
