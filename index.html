@@ -463,14 +463,10 @@ window.MonReleve=function MonReleve(){
       </div>
       <button onClick={()=>{
         if(!pr.nom.trim()||!pr.entreprise.trim()){flash("Remplissez tous les champs");return;}
-        const oldP=origPr||ldProf();
-        const changes=[];
-        if(ok&&oldP.nom&&oldP.nom!==pr.nom.trim())changes.push({title:"Modification du nom",text:"Changer le nom créera un nouveau profil.\nL'historique existant sous \""+oldP.nom+"\" ne sera pas transféré."});
-        if(ok&&oldP.contrat&&oldP.contrat!==pr.contrat)changes.push({title:"Modification du contrat",text:"Changer le contrat recalculera l'ensemble du compteur de report.\nCette opération peut modifier l'historique calculé."});
-        if(ok&&(oldP.pauseMatinHeure!==pr.pauseMatinHeure||oldP.pauseMatinFin!==pr.pauseMatinFin||oldP.pauseMidiDebut!==pr.pauseMidiDebut||oldP.pauseMidiFin!==pr.pauseMidiFin))changes.push({title:"Modification des pauses",text:"Modifier les pauses recalculera les semaines déjà enregistrées."});
-        if(ok&&oldP.entreprise&&oldP.entreprise!==pr.entreprise.trim()&&changes.length===0)changes.push({title:"Modification de l'entreprise",text:"Cette modification affectera les futurs relevés PDF."});
         const doSave=()=>{svProf(pr);setOk(true);setEd(false);setOrigPr(null);recalcCounter(pr.nom);setRk(x=>x+1);flash("Enregistré ✓");};
-        if(changes.length>0){setConfirmPop({title:"⚠️ "+changes[0].title,text:changes[0].text,onConfirm:doSave});}
+        const oldP=origPr||ldProf();
+        const hasChanges=ok&&oldP.nom&&(oldP.nom!==pr.nom.trim()||oldP.contrat!==pr.contrat||oldP.entreprise!==pr.entreprise.trim()||oldP.pauseMatinHeure!==pr.pauseMatinHeure||oldP.pauseMatinFin!==pr.pauseMatinFin||oldP.pauseMidiDebut!==pr.pauseMidiDebut||oldP.pauseMidiFin!==pr.pauseMidiFin);
+        if(hasChanges){setConfirmPop({title:"⚠️ Modifications détectées",text:"Les changements seront appliqués et le compteur recalculé.\nCette opération peut modifier l'historique.",onConfirm:doSave});}
         else{doSave();}
       }} style={{...st.cta,width:"100%"}}>{ok?"Enregistrer":"Commencer"}</button>
       {ok&&<button onClick={()=>{if(origPr)setPr(origPr);setOrigPr(null);setEd(false);}} style={{...st.sec,width:"100%",marginTop:10}}>Annuler</button>}
