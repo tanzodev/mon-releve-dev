@@ -176,6 +176,22 @@ function addHist(t){if(!t)return;const arr=ldHist();const idx=arr.findIndex(x=>x
 function getHist(){return ldHist().slice(0,6).map(x=>x.t);}
 
 // ── TimeInput Component ──
+function exportPDF(){
+  // iOS standalone PWA: window.print() peut être bloqué
+  // Fallback: capturer le HTML du relevé et le partager comme fichier
+  const pdfEl=document.getElementById("releve-pdf");
+  if(pdfEl&&navigator.share&&navigator.canShare){
+    try{
+      const styles=document.querySelector("style")?document.querySelector("style").textContent:"";
+      const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relevé</title><style>${styles}body{background:#fff!important;color:#000!important;margin:0;padding:20px;font-family:-apple-system,Helvetica,sans-serif}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${pdfEl.outerHTML}</body></html>`;
+      const blob=new Blob([html],{type:"text/html"});
+      const file=new File([blob],"releve.html",{type:"text/html"});
+      if(navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(()=>{});return;}
+    }catch(e){}
+  }
+  // Fallback standard
+  try{window.print();}catch(e){}
+}
 function TimeInput({value,onChange,label,noHistory}){
   const[focused,setFocused]=useState(false);
   const[raw,setRaw]=useState("");
@@ -500,7 +516,7 @@ window.MonReleve=function MonReleve(){
       </div>}
       <Releve data={wd} ck={ck} l={lun} v={ven} moisFilter={pdfMois}/>
       <div style={{padding:"0 16px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-        <button onClick={()=>window.print()} style={{...st.cta,width:"100%",maxWidth:280}}>Exporter en PDF</button>
+        <button onClick={exportPDF} style={{...st.cta,width:"100%",maxWidth:280}}>Exporter en PDF</button>
         <p style={{fontSize:11,color:P.sub,textAlign:"center"}}>Enregistrez le PDF puis partagez-le par mail ou AirDrop.</p>
       </div>
     </div>
@@ -509,7 +525,7 @@ window.MonReleve=function MonReleve(){
   // ── Archive detail ──
   if(arch){const al=getLunCle(arch.cle);const av=new Date(al.getTime()+4*MS_DAY);const chevalArch=al.getMonth()!==av.getMonth()||al.getFullYear()!==av.getFullYear();const ma1={m:al.getMonth(),y:al.getFullYear()};const ma2={m:av.getMonth(),y:av.getFullYear()};return(
     <div style={st.app}>
-      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);setPdfMois(null);}} style={st.topBtn}>← Historique</button><button onClick={()=>window.print()} style={st.topAct}>PDF</button></div>
+      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);setPdfMois(null);}} style={st.topBtn}>← Historique</button><button onClick={exportPDF} style={st.topAct}>PDF</button></div>
       {chevalArch&&<div style={{display:"flex",gap:6,padding:"0 16px 8px",justifyContent:"center"}}>
         <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===ma1.m?null:ma1)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===ma1.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===ma1.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===ma1.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[ma1.m]}</button>
         <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===ma2.m?null:ma2)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===ma2.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===ma2.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===ma2.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[ma2.m]}</button>
