@@ -492,7 +492,7 @@ window.MonReleve=function MonReleve(){
     const m1={m:lun.getMonth(),y:lun.getFullYear()};const m2p={m:ven.getMonth(),y:ven.getFullYear()};
     return(
     <div style={st.app}>
-      <div style={st.topBar}><button onClick={()=>{setPop(false);setPdfMois(null);}} style={st.topBtn}>← Retour</button></div>
+      <div style={st.topBar}><button onClick={()=>{setPop(false);setPdfMois(null);}} style={st.topBtn}>← Retour</button><button onClick={()=>{alert("tap OK");window.print();}} style={st.topAct}>PDF</button></div>
       {chevalPop&&<div style={{display:"flex",gap:6,padding:"0 16px 8px",justifyContent:"center"}}>
         <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===m1.m?null:m1)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===m1.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===m1.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===m1.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[m1.m]}</button>
         <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===m2p.m?null:m2p)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===m2p.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===m2p.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===m2p.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[m2p.m]}</button>
