@@ -13,7 +13,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html{min-height:100%;background-color:#0B1120;background-image:radial-gradient(circle at top,#12213D 0%,#0B1120 60%);background-attachment:fixed;overscroll-behavior:none}
 body{min-height:100%;min-height:100dvh;width:100%;overflow-x:hidden;color:#fff;background-color:#0B1120;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
-#status-bg{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.04));backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);z-index:60}
+#status-bg{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:#0B1120;z-index:60}
 #root{min-height:100vh;min-height:100dvh;padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
 select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='rgba(255,255,255,.5)' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
 option{background:#1a2332;color:#e2e8f0}
@@ -176,22 +176,6 @@ function addHist(t){if(!t)return;const arr=ldHist();const idx=arr.findIndex(x=>x
 function getHist(){return ldHist().slice(0,6).map(x=>x.t);}
 
 // ── TimeInput Component ──
-function exportPDF(){
-  // iOS standalone PWA: window.print() peut être bloqué
-  // Fallback: capturer le HTML du relevé et le partager comme fichier
-  const pdfEl=document.getElementById("releve-pdf");
-  if(pdfEl&&navigator.share&&navigator.canShare){
-    try{
-      const styles=document.querySelector("style")?document.querySelector("style").textContent:"";
-      const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relevé</title><style>${styles}body{background:#fff!important;color:#000!important;margin:0;padding:20px;font-family:-apple-system,Helvetica,sans-serif}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${pdfEl.outerHTML}</body></html>`;
-      const blob=new Blob([html],{type:"text/html"});
-      const file=new File([blob],"releve.html",{type:"text/html"});
-      if(navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(()=>{});return;}
-    }catch(e){}
-  }
-  // Fallback standard
-  try{window.print();}catch(e){}
-}
 function TimeInput({value,onChange,label,noHistory}){
   const[focused,setFocused]=useState(false);
   const[raw,setRaw]=useState("");
@@ -516,7 +500,7 @@ window.MonReleve=function MonReleve(){
       </div>}
       <Releve data={wd} ck={ck} l={lun} v={ven} moisFilter={pdfMois}/>
       <div style={{padding:"0 16px 32px",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-        <button onClick={exportPDF} style={{...st.cta,width:"100%",maxWidth:280}}>Exporter en PDF</button>
+        <button onClick={()=>window.print()} style={{...st.cta,width:"100%",maxWidth:280}}>Exporter en PDF</button>
         <p style={{fontSize:11,color:P.sub,textAlign:"center"}}>Enregistrez le PDF puis partagez-le par mail ou AirDrop.</p>
       </div>
     </div>
@@ -525,7 +509,7 @@ window.MonReleve=function MonReleve(){
   // ── Archive detail ──
   if(arch){const al=getLunCle(arch.cle);const av=new Date(al.getTime()+4*MS_DAY);const chevalArch=al.getMonth()!==av.getMonth()||al.getFullYear()!==av.getFullYear();const ma1={m:al.getMonth(),y:al.getFullYear()};const ma2={m:av.getMonth(),y:av.getFullYear()};return(
     <div style={st.app}>
-      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);setPdfMois(null);}} style={st.topBtn}>← Historique</button><button onClick={exportPDF} style={st.topAct}>PDF</button></div>
+      <div style={st.topBar}><button onClick={()=>{setArch(null);setCfDel(false);setPdfMois(null);}} style={st.topBtn}>← Historique</button><button onClick={()=>window.print()} style={st.topAct}>PDF</button></div>
       {chevalArch&&<div style={{display:"flex",gap:6,padding:"0 16px 8px",justifyContent:"center"}}>
         <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===ma1.m?null:ma1)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===ma1.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===ma1.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===ma1.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[ma1.m]}</button>
         <button onClick={()=>setPdfMois(pdfMois&&pdfMois.m===ma2.m?null:ma2)} style={{fontSize:11,fontWeight:600,padding:"6px 14px",borderRadius:20,border:`1px solid ${pdfMois&&pdfMois.m===ma2.m?P.teal:P.border}`,background:pdfMois&&pdfMois.m===ma2.m?"rgba(45,212,168,.1)":"transparent",color:pdfMois&&pdfMois.m===ma2.m?P.teal:P.sub,cursor:"pointer"}}>{MOIS[ma2.m]}</button>
